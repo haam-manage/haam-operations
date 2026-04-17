@@ -228,11 +228,16 @@ export async function sendOtpAlimtalk(params: {
   phone: string;
   code: string;
 }): Promise<SendAlimtalkResult> {
+  // 템플릿 변수명은 심사 과정에서 달라질 수 있어 여러 형식 모두 시도
   return sendAlimtalk({
     templateId: TEMPLATE_IDS.OTP_AUTH,
     recipientPhone: params.phone,
     variables: {
       '#{code}': params.code,
+      '#{CODE}': params.code,
+      '#{인증번호}': params.code,
+      code: params.code,
+      인증번호: params.code,
     },
   });
 }
