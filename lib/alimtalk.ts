@@ -95,6 +95,9 @@ export async function sendAlimtalk(input: SendAlimtalkInput): Promise<SendAlimta
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
+      // 디버그 로그: 요청 페이로드
+      console.log('[alimtalk] Request to Solapi:', JSON.stringify(messageBody));
+
       const res = await fetch(SOLAPI_API_URL, {
         method: 'POST',
         headers: {
@@ -105,6 +108,10 @@ export async function sendAlimtalk(input: SendAlimtalkInput): Promise<SendAlimta
       });
 
       const data = await res.json();
+
+      // 디버그 로그: 전체 응답
+      console.log('[alimtalk] Response status:', res.status);
+      console.log('[alimtalk] Response body:', JSON.stringify(data));
 
       if (res.ok) {
         return {
