@@ -232,7 +232,7 @@ export async function sendOtpAlimtalk(params: {
     templateId: TEMPLATE_IDS.OTP_AUTH,
     recipientPhone: params.phone,
     variables: {
-      '#{인증번호}': params.code,
+      '#{code}': params.code,
     },
   });
 }
