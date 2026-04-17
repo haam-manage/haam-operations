@@ -1,0 +1,20 @@
+{
+  "phase": 2,
+  "completed_at": "2026-04-16T16:10:00+09:00",
+  "artifacts": [
+    "lib/price.ts",
+    "lib/status.ts",
+    "lib/validation.ts",
+    "tests/unit/price.test.ts",
+    "tests/unit/status.test.ts",
+    "tests/unit/validation.test.ts"
+  ],
+  "human_approval": false,
+  "validation_results": {
+    "total_tests": 71,
+    "passed": 71,
+    "failed": 0,
+    "typescript_check": "pass"
+  },
+  "next_phase": 3
+}
