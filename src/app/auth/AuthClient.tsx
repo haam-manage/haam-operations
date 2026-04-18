@@ -1,15 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Loader2, Check, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { formatPhone } from '../../components/Input';
 import { ConsentCheckboxes, type ConsentState } from '../../components/ConsentCheckboxes';
 
-type Stage = 'phone' | 'otp' | 'name' | 'done';
+type Stage = 'intro' | 'otp' | 'terms' | 'done';
 
 interface Props {
   redirectTo: string;
@@ -18,7 +17,7 @@ interface Props {
 export default function AuthClient({ redirectTo }: Props) {
   const router = useRouter();
 
-  const [stage, setStage] = useState<Stage>('phone');
+  const [stage, setStage] = useState<Stage>('intro');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
@@ -35,26 +34,34 @@ export default function AuthClient({ redirectTo }: Props) {
   });
 
   const consentValid = consent.age14 && consent.terms && consent.privacy;
+  const nameValid = name.trim().length >= 2;
+  const phoneValid = phone.replace(/\D/g, '').length >= 10;
 
+  const phoneInputRef = useRef<HTMLInputElement>(null);
   const otpInputRef = useRef<HTMLInputElement>(null);
-  const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // OTP 카운트다운
   useEffect(() => {
     if (countdown <= 0) return;
     const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  // Stage 변경 시 자동 포커스
   useEffect(() => {
     if (stage === 'otp') setTimeout(() => otpInputRef.current?.focus(), 400);
-    if (stage === 'name') setTimeout(() => nameInputRef.current?.focus(), 400);
   }, [stage]);
 
-  // 전화번호 입력 후 OTP 발송
+  useEffect(() => {
+    if (stage === 'intro' && nameValid && !phone) {
+      setTimeout(() => phoneInputRef.current?.focus(), 450);
+    }
+  }, [stage, nameValid, phone]);
+
   const handleSendOtp = async () => {
     const cleanPhone = phone.replace(/\D/g, '');
+    if (!nameValid) {
+      toast.error('이름을 먼저 입력해 주세요');
+      return;
+    }
     if (!cleanPhone.match(/^01[016789]\d{7,8}$/)) {
       toast.error('올바른 전화번호를 입력해 주세요');
       return;
@@ -62,7 +69,6 @@ export default function AuthClient({ redirectTo }: Props) {
 
     setLoading(true);
     try {
-      // 1. 기존 회원 여부 확인
       const checkRes = await fetch('/api/auth/check-exists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,7 +78,6 @@ export default function AuthClient({ redirectTo }: Props) {
       setIsReturningUser(checkData.exists);
       setExistingName(checkData.name);
 
-      // 2. OTP 발송 (카카오 알림톡)
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -100,7 +105,6 @@ export default function AuthClient({ redirectTo }: Props) {
     }
   };
 
-  // OTP 검증
   const handleVerifyOtp = async () => {
     if (otp.length !== 6) return;
 
@@ -112,7 +116,6 @@ export default function AuthClient({ redirectTo }: Props) {
         body: JSON.stringify({
           phone: phone.replace(/\D/g, ''),
           code: otp,
-          // 재방문자는 name 전달 안 함 (기존 DB 이름 사용)
           name: isReturningUser ? undefined : name.trim() || undefined,
         }),
       });
@@ -125,10 +128,8 @@ export default function AuthClient({ redirectTo }: Props) {
       }
 
       if (data.isNewUser) {
-        // 신규 회원: 이름 입력 단계로
-        setStage('name');
+        setStage('terms');
       } else {
-        // 기존 회원: 바로 완료
         setStage('done');
         toast.success(`${data.customerName}님, 다시 만나서 반가워요!`);
         setTimeout(() => router.push(redirectTo), 1200);
@@ -140,12 +141,7 @@ export default function AuthClient({ redirectTo }: Props) {
     }
   };
 
-  // 신규 회원 이름 등록
   const handleRegister = async () => {
-    if (!name.trim()) {
-      toast.error('이름을 입력해 주세요');
-      return;
-    }
     if (!consentValid) {
       toast.error('필수 약관에 동의해 주세요');
       return;
@@ -175,7 +171,6 @@ export default function AuthClient({ redirectTo }: Props) {
     }
   };
 
-  // 카카오 로그인
   const handleKakaoLogin = () => {
     const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY;
     if (!kakaoKey) {
@@ -190,30 +185,27 @@ export default function AuthClient({ redirectTo }: Props) {
 
   const goBack = () => {
     if (stage === 'otp') {
-      setStage('phone');
+      setStage('intro');
       setOtp('');
-    } else if (stage === 'name') {
-      setStage('phone');
-      setOtp('');
-      setName('');
     } else router.back();
   };
 
-  const progress = stage === 'phone' ? 33 : stage === 'otp' ? 66 : 100;
+  const progress = stage === 'intro' ? (nameValid ? 40 : 20) : stage === 'otp' ? 70 : 100;
+
+  const greetName = isReturningUser && existingName ? existingName : name.trim();
 
   return (
     <main className="min-h-screen flex flex-col">
-      {/* Header */}
       <header className="safe-top sticky top-0 bg-[#0c0a09]/95 backdrop-blur-lg z-40">
         <div className="max-w-lg mx-auto px-5 py-3 flex items-center justify-between">
-          {stage !== 'done' ? (
+          {stage !== 'done' && stage !== 'terms' ? (
             <button onClick={goBack} className="touch-target w-10 h-10 -ml-2 flex items-center text-stone-400">
               <ArrowLeft className="w-5 h-5" />
             </button>
           ) : (
             <div className="w-10" />
           )}
-          <Image src="/images/HAAM_LOGO(S)_001.jpg" alt="HAAM" width={24} height={24} className="rounded-md" />
+          <div className="w-6" />
           <div className="w-10" />
         </div>
         <div className="h-0.5 bg-white/5">
@@ -227,170 +219,170 @@ export default function AuthClient({ redirectTo }: Props) {
       </header>
 
       <div className="flex-1 max-w-lg mx-auto w-full px-6 pt-8 pb-32 flex flex-col">
-        {stage !== 'done' ? (
+        {stage === 'intro' && (
           <>
-            {/* 인사말 */}
             <motion.div
-              key={stage}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
               className="mb-8"
             >
-              {stage === 'phone' && (
-                <>
-                  <h1 className="text-2xl font-bold text-white mb-2">
-                    반갑습니다
-                  </h1>
-                  <h1 className="text-2xl font-bold text-white mb-2">
-                    전화번호를 입력해 주세요
-                  </h1>
-                  <p className="text-sm text-stone-500">카카오톡으로 인증번호를 보내드려요</p>
-                </>
-              )}
-              {stage === 'otp' && (
-                <>
-                  <h1 className="text-2xl font-bold text-white mb-2">
-                    인증번호를 입력해 주세요
-                  </h1>
-                  <p className="text-sm text-stone-500">
-                    {isReturningUser && existingName ? (
-                      <>{existingName}님, 카카오톡을 확인해 주세요</>
-                    ) : (
-                      <>{phone}로 보낸 6자리</>
-                    )}
-                  </p>
-                </>
-              )}
-              {stage === 'name' && (
-                <>
-                  <h1 className="text-2xl font-bold text-white mb-2">
-                    처음 오셨네요!
-                  </h1>
-                  <h1 className="text-2xl font-bold text-white mb-2">
-                    어떻게 불러드릴까요?
-                  </h1>
-                  <p className="text-sm text-stone-500">계약서에 사용할 이름이에요</p>
-                </>
-              )}
+              <h1 className="text-2xl font-bold text-white mb-2">
+                어떻게 불러드릴까요?
+              </h1>
+              <p className="text-sm text-stone-500">계약서에 사용할 이름이에요</p>
             </motion.div>
 
-            {/* 입력 영역 */}
-            <div className="space-y-5 flex-1">
-              {/* Stage: Phone */}
-              {stage === 'phone' && (
-                <>
-                  {/* 카카오 로그인 버튼 */}
-                  <motion.button
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4 }}
-                    onClick={handleKakaoLogin}
-                    className="w-full py-4 rounded-xl bg-[#FEE500] text-black font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-                  >
-                    <MessageCircle className="w-5 h-5 fill-black" />
-                    카카오로 시작하기
-                  </motion.button>
+            <div className="space-y-6 flex-1">
+              <div>
+                <label className="text-xs text-stone-500 mb-2 block">이름</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="홍길동"
+                  className="input-dark text-lg"
+                  autoFocus
+                  autoComplete="name"
+                />
+              </div>
 
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-px bg-white/8" />
-                    <span className="text-xs text-stone-600">또는</span>
-                    <div className="flex-1 h-px bg-white/8" />
-                  </div>
-
-                  {/* 전화번호 입력 */}
+              <AnimatePresence>
+                {nameValid && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.1 }}
+                    initial={{ opacity: 0, y: -16, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: -16, height: 0 }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                    className="space-y-5 overflow-hidden"
                   >
-                    <label className="text-xs text-stone-500 mb-2 block">전화번호</label>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={e => setPhone(formatPhone(e.target.value))}
-                      placeholder="010-1234-5678"
-                      className="input-dark text-lg"
-                      autoFocus
-                      onKeyDown={e => e.key === 'Enter' && handleSendOtp()}
-                    />
+                    <p className="text-base text-amber-500 pt-1">
+                      {name.trim()}님, 반가워요 👋
+                    </p>
+
+                    <div>
+                      <label className="text-xs text-stone-500 mb-2 block">전화번호</label>
+                      <input
+                        ref={phoneInputRef}
+                        type="tel"
+                        value={phone}
+                        onChange={e => setPhone(formatPhone(e.target.value))}
+                        placeholder="010-1234-5678"
+                        className="input-dark text-lg"
+                        autoComplete="tel"
+                        onKeyDown={e => e.key === 'Enter' && phoneValid && handleSendOtp()}
+                      />
+                      <p className="text-xs text-stone-600 mt-2">카카오톡으로 인증번호를 보내드려요</p>
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-1">
+                      <div className="flex-1 h-px bg-white/8" />
+                      <span className="text-xs text-stone-600">또는</span>
+                      <div className="flex-1 h-px bg-white/8" />
+                    </div>
+
+                    <button
+                      onClick={handleKakaoLogin}
+                      className="w-full py-4 rounded-xl bg-[#FEE500] text-black font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+                    >
+                      <MessageCircle className="w-5 h-5 fill-black" />
+                      카카오로 빠르게 시작
+                    </button>
                   </motion.div>
-                </>
-              )}
-
-              {/* Stage: OTP */}
-              {stage === 'otp' && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4 }}
-                >
-                  <label className="text-xs text-stone-500 mb-2 flex justify-between items-center">
-                    <span>인증번호 (6자리)</span>
-                    {countdown > 0 ? (
-                      <span className="text-amber-600 font-mono">
-                        {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
-                      </span>
-                    ) : (
-                      <button onClick={handleSendOtp} className="text-amber-600 underline">
-                        재발송
-                      </button>
-                    )}
-                  </label>
-                  <input
-                    ref={otpInputRef}
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={otp}
-                    onChange={e => {
-                      const v = e.target.value.replace(/\D/g, '').slice(0, 6);
-                      setOtp(v);
-                    }}
-                    onKeyDown={e => e.key === 'Enter' && otp.length === 6 && handleVerifyOtp()}
-                    placeholder="000000"
-                    className="input-dark text-center text-3xl tracking-[0.5em] font-mono"
-                    autoComplete="one-time-code"
-                  />
-                  <p className="text-xs text-stone-600 mt-2">
-                    {otpChannel === 'alimtalk'
-                      ? '📱 카카오톡 "도심창고:함 HAAM" 채널에서 확인해 주세요'
-                      : '📱 문자 메시지를 확인해 주세요'}
-                  </p>
-                </motion.div>
-              )}
-
-              {/* Stage: Name (신규 회원만) */}
-              {stage === 'name' && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4 }}
-                  className="space-y-6"
-                >
-                  <div>
-                    <label className="text-xs text-stone-500 mb-2 block">이름</label>
-                    <input
-                      ref={nameInputRef}
-                      type="text"
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      placeholder="홍길동"
-                      className="input-dark text-lg"
-                    />
-                  </div>
-
-                  {/* 약관 동의 */}
-                  <div>
-                    <label className="text-xs text-stone-500 mb-3 block">약관 동의</label>
-                    <ConsentCheckboxes value={consent} onChange={setConsent} />
-                  </div>
-                </motion.div>
-              )}
+                )}
+              </AnimatePresence>
             </div>
           </>
-        ) : (
-          /* Done */
+        )}
+
+        {stage === 'otp' && (
+          <>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="mb-8"
+            >
+              <h1 className="text-2xl font-bold text-white mb-2">
+                {greetName ? `${greetName}님, ` : ''}인증번호를 입력해 주세요
+              </h1>
+              <p className="text-sm text-stone-500">
+                {isReturningUser && existingName ? (
+                  <>카카오톡을 확인해 주세요</>
+                ) : (
+                  <>{phone}로 보낸 6자리</>
+                )}
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              <label className="text-xs text-stone-500 mb-2 flex justify-between items-center">
+                <span>인증번호 (6자리)</span>
+                {countdown > 0 ? (
+                  <span className="text-amber-600 font-mono">
+                    {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
+                  </span>
+                ) : (
+                  <button onClick={handleSendOtp} className="text-amber-600 underline">
+                    재발송
+                  </button>
+                )}
+              </label>
+              <input
+                ref={otpInputRef}
+                type="tel"
+                inputMode="numeric"
+                maxLength={6}
+                value={otp}
+                onChange={e => {
+                  const v = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setOtp(v);
+                }}
+                onKeyDown={e => e.key === 'Enter' && otp.length === 6 && handleVerifyOtp()}
+                placeholder="000000"
+                className="input-dark text-center text-3xl tracking-[0.5em] font-mono"
+                autoComplete="one-time-code"
+              />
+              <p className="text-xs text-stone-600 mt-2">
+                {otpChannel === 'alimtalk'
+                  ? '📱 카카오톡 "도심창고:함 HAAM" 채널에서 확인해 주세요'
+                  : '📱 문자 메시지를 확인해 주세요'}
+              </p>
+            </motion.div>
+          </>
+        )}
+
+        {stage === 'terms' && (
+          <>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="mb-8"
+            >
+              <h1 className="text-2xl font-bold text-white mb-2">
+                마지막 단계예요
+              </h1>
+              <p className="text-sm text-stone-500">
+                {name.trim()}님, 약관에 동의해 주세요
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              <ConsentCheckboxes value={consent} onChange={setConsent} />
+            </motion.div>
+          </>
+        )}
+
+        {stage === 'done' && (
           <div className="flex-1 flex flex-col items-center justify-center">
             <motion.div
               initial={{ scale: 0 }}
@@ -406,7 +398,7 @@ export default function AuthClient({ redirectTo }: Props) {
               transition={{ delay: 0.3 }}
               className="text-2xl font-bold text-white mb-2"
             >
-              {isReturningUser ? '환영합니다!' : `${name}님, 환영합니다!`}
+              {greetName ? `${greetName}님, 환영합니다!` : '환영합니다!'}
             </motion.h1>
             <motion.p
               initial={{ opacity: 0 }}
@@ -420,14 +412,13 @@ export default function AuthClient({ redirectTo }: Props) {
         )}
       </div>
 
-      {/* Sticky CTA */}
       {stage !== 'done' && (
         <div className="sticky-bottom">
           <div className="max-w-lg mx-auto">
-            {stage === 'phone' && (
+            {stage === 'intro' && (
               <button
                 onClick={handleSendOtp}
-                disabled={phone.replace(/\D/g, '').length < 10 || loading}
+                disabled={!nameValid || !phoneValid || loading}
                 className="btn-primary w-full py-4 text-base gap-2"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
@@ -452,10 +443,10 @@ export default function AuthClient({ redirectTo }: Props) {
                 )}
               </button>
             )}
-            {stage === 'name' && (
+            {stage === 'terms' && (
               <button
                 onClick={handleRegister}
-                disabled={!name.trim() || !consentValid || loading}
+                disabled={!consentValid || loading}
                 className="btn-primary w-full py-4 text-base gap-2"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
@@ -469,7 +460,6 @@ export default function AuthClient({ redirectTo }: Props) {
           </div>
         </div>
       )}
-
     </main>
   );
 }
