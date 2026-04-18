@@ -26,6 +26,7 @@ export default function AuthClient({ redirectTo }: Props) {
   const [isReturningUser, setIsReturningUser] = useState(false);
   const [existingName, setExistingName] = useState<string | null>(null);
   const [otpChannel, setOtpChannel] = useState<'alimtalk' | 'sms'>('alimtalk');
+  const [nameSettled, setNameSettled] = useState(false);
   const [consent, setConsent] = useState<ConsentState>({
     age14: false,
     terms: false,
@@ -49,6 +50,12 @@ export default function AuthClient({ redirectTo }: Props) {
   useEffect(() => {
     if (stage === 'otp') setTimeout(() => otpInputRef.current?.focus(), 400);
   }, [stage]);
+
+  useEffect(() => {
+    if (!nameValid) { setNameSettled(false); return; }
+    const t = setTimeout(() => setNameSettled(true), 600);
+    return () => clearTimeout(t);
+  }, [nameValid, name]);
 
   const handleSendOtp = async () => {
     const cleanPhone = phone.replace(/\D/g, '');
@@ -242,19 +249,31 @@ export default function AuthClient({ redirectTo }: Props) {
               </div>
 
               <AnimatePresence>
-                {nameValid && (
+                {nameSettled && (
                   <motion.div
-                    initial={{ opacity: 0, y: -16, height: 0 }}
-                    animate={{ opacity: 1, y: 0, height: 'auto' }}
-                    exit={{ opacity: 0, y: -16, height: 0 }}
-                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0, transition: { duration: 0.25, ease: 'easeIn' } }}
+                    transition={{
+                      height: { duration: 0.7, ease: [0.16, 1, 0.3, 1] },
+                      opacity: { duration: 0.4, ease: [0.16, 1, 0.3, 1] },
+                    }}
                     className="space-y-5 overflow-hidden"
                   >
-                    <p className="text-base text-amber-500 pt-1">
+                    <motion.p
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+                      className="text-base text-amber-500 pt-1"
+                    >
                       {name.trim()}님, 반가워요 👋
-                    </p>
+                    </motion.p>
 
-                    <div>
+                    <motion.div
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    >
                       <label className="text-xs text-stone-500 mb-2 block">전화번호</label>
                       <input
                         ref={phoneInputRef}
@@ -267,21 +286,29 @@ export default function AuthClient({ redirectTo }: Props) {
                         onKeyDown={e => e.key === 'Enter' && phoneValid && handleSendOtp()}
                       />
                       <p className="text-xs text-stone-600 mt-2">카카오톡으로 인증번호를 보내드려요</p>
-                    </div>
+                    </motion.div>
 
-                    <div className="flex items-center gap-3 pt-1">
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.4, delay: 0.4 }}
+                      className="flex items-center gap-3 pt-1"
+                    >
                       <div className="flex-1 h-px bg-white/8" />
                       <span className="text-xs text-stone-600">또는</span>
                       <div className="flex-1 h-px bg-white/8" />
-                    </div>
+                    </motion.div>
 
-                    <button
+                    <motion.button
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
                       onClick={handleKakaoLogin}
                       className="w-full py-4 rounded-xl bg-[#FEE500] text-black font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
                     >
                       <MessageCircle className="w-5 h-5 fill-black" />
                       카카오로 빠르게 시작
-                    </button>
+                    </motion.button>
                   </motion.div>
                 )}
               </AnimatePresence>
