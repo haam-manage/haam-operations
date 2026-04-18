@@ -52,14 +52,6 @@ export default function AuthClient({ redirectTo }: Props) {
     if (stage === 'name') setTimeout(() => nameInputRef.current?.focus(), 400);
   }, [stage]);
 
-  // OTP 6자리 입력 완료 시 자동 검증 (stale closure 방지)
-  useEffect(() => {
-    if (otp.length === 6 && stage === 'otp' && !loading) {
-      handleVerifyOtp();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otp, stage]);
-
   // 전화번호 입력 후 OTP 발송
   const handleSendOtp = async () => {
     const cleanPhone = phone.replace(/\D/g, '');
@@ -355,6 +347,7 @@ export default function AuthClient({ redirectTo }: Props) {
                       const v = e.target.value.replace(/\D/g, '').slice(0, 6);
                       setOtp(v);
                     }}
+                    onKeyDown={e => e.key === 'Enter' && otp.length === 6 && handleVerifyOtp()}
                     placeholder="000000"
                     className="input-dark text-center text-3xl tracking-[0.5em] font-mono"
                     autoComplete="one-time-code"
@@ -428,7 +421,7 @@ export default function AuthClient({ redirectTo }: Props) {
       </div>
 
       {/* Sticky CTA */}
-      {stage !== 'done' && stage !== 'otp' && (
+      {stage !== 'done' && (
         <div className="sticky-bottom">
           <div className="max-w-lg mx-auto">
             {stage === 'phone' && (
@@ -440,6 +433,20 @@ export default function AuthClient({ redirectTo }: Props) {
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                   <>
                     인증번호 받기
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
+            )}
+            {stage === 'otp' && (
+              <button
+                onClick={handleVerifyOtp}
+                disabled={otp.length !== 6 || loading}
+                className="btn-primary w-full py-4 text-base gap-2"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                  <>
+                    확인
                     <ArrowRight className="w-5 h-5" />
                   </>
                 )}
