@@ -50,12 +50,6 @@ export default function AuthClient({ redirectTo }: Props) {
     if (stage === 'otp') setTimeout(() => otpInputRef.current?.focus(), 400);
   }, [stage]);
 
-  useEffect(() => {
-    if (stage === 'intro' && nameValid && !phone) {
-      setTimeout(() => phoneInputRef.current?.focus(), 450);
-    }
-  }, [stage, nameValid, phone]);
-
   const handleSendOtp = async () => {
     const cleanPhone = phone.replace(/\D/g, '');
     if (!nameValid) {

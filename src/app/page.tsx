@@ -51,25 +51,6 @@ export default function SplashPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#0c0a09] via-transparent to-transparent" />
       </div>
 
-      {/* ─── Top: Logo ─── */}
-      <div className="relative z-10 safe-top pt-8 px-6">
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="flex items-center justify-center"
-        >
-          <Image
-            src="/images/HAAM_LOGO(S)_001.jpg"
-            alt="HAAM"
-            width={56}
-            height={56}
-            className="rounded-2xl shadow-xl"
-            priority
-          />
-        </motion.div>
-      </div>
-
       {/* ─── Center: Tagline with slide sync ─── */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6">
         <AnimatePresence mode="wait">
