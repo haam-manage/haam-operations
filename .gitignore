@@ -30,9 +30,16 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
+# env files (모든 시크릿은 env var로만 관리, 코드에 쓰지 말 것)
 .env*
 !.env.example
+
+# GAS 레거시 참조 (키 하드코딩 위험 — 로컬에서만 유지, 절대 커밋 금지)
+legacy-gas/
+_legacy-gas-backup/
+**/Constants.gs
+*.secrets.*
+*.secret
 
 # output logs (git tracked structure, not content)
 output/logs/*.jsonl
@@ -43,3 +50,5 @@ output/logs/*.jsonl
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
