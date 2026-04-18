@@ -1,8 +1,9 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft } from 'lucide-react';
-import Image from 'next/image';
+import { ArrowLeft, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 interface StepLayoutProps {
   step: number;
@@ -13,9 +14,24 @@ interface StepLayoutProps {
   children: React.ReactNode;
   bottomCTA?: React.ReactNode;
   direction?: 'forward' | 'back';
+  showLogout?: boolean;
 }
 
-export function StepLayout({ step, totalSteps, title, subtitle, onBack, children, bottomCTA, direction = 'forward' }: StepLayoutProps) {
+export function StepLayout({ step, totalSteps, title, subtitle, onBack, children, bottomCTA, direction = 'forward', showLogout = true }: StepLayoutProps) {
+  const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    if (!confirm('로그아웃 하시겠어요?')) return;
+    setLoggingOut(true);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      router.replace('/');
+    }
+  };
+
   return (
     <main className="min-h-screen flex flex-col">
       {/* Header */}
@@ -28,8 +44,19 @@ export function StepLayout({ step, totalSteps, title, subtitle, onBack, children
           ) : (
             <div className="w-10" />
           )}
-          <Image src="/images/HAAM_LOGO(S)_001.jpg" alt="HAAM" width={24} height={24} className="rounded-md" />
-          <div className="w-10" />
+          <div className="w-6" />
+          {showLogout ? (
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              aria-label="로그아웃"
+              className="touch-target w-10 h-10 -mr-2 text-stone-400 flex items-center justify-center"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          ) : (
+            <div className="w-10" />
+          )}
         </div>
         {/* Progress bar */}
         <div className="h-0.5 bg-white/5">
