@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>HAAM UX 지도 — 스토리보드</title>
+<style>
+  :root {
+    --bg: #f5f5f4;
+    --fg: #1c1917;
+    --muted: #57534e;
+    --panel: #ffffff;
+    --border: #e7e5e4;
+    --phone-bg: #0c0a09;
+    --phone-fg: #f5f5f4;
+    --phone-muted: #a8a29e;
+    --amber: #b45309;
+    --green: #16a34a;
+    --yellow: #eab308;
+    --red: #dc2626;
+    --orange: #ea580c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 28px 20px 80px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  .lead { color: var(--muted); font-size: 15px; margin-bottom: 8px; }
+  .note { background: #fef3c7; border: 1px solid #fcd34d; color: #78350f; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin: 12px 0 24px; }
+
+  h2 {
+    font-size: 20px; margin: 36px 0 6px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  h2 .badge {
+    font-size: 11px; padding: 3px 8px; border-radius: 999px; font-weight: 600;
+  }
+  h2 .badge.ok   { background: #dcfce7; color: #14532d; }
+  h2 .badge.bad  { background: #fee2e2; color: #7f1d1d; }
+  .story-sub { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+
+  /* 스토리보드: 가로 스크롤 가능한 화면 연쇄 */
+  .storyboard {
+    display: flex; gap: 14px; align-items: flex-start;
+    overflow-x: auto; padding: 8px 4px 20px;
+  }
+  .step {
+    flex: 0 0 auto;
+    display: flex; flex-direction: column; align-items: center;
+    position: relative;
+  }
+  .step + .step::before {
+    content: "→";
+    position: absolute;
+    left: -14px; top: 120px;
+    font-size: 22px; color: var(--muted);
+  }
+  .label {
+    margin-top: 10px; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .sub-label { color: var(--muted); font-size: 12px; margin-top: 2px; max-width: 180px; text-align: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.green  { background: var(--green); }
+  .dot.yellow { background: var(--yellow); }
+  .dot.red    { background: var(--red); }
+  .dot.orange { background: var(--orange); }
+
+  /* 핸드폰 프레임 */
+  .phone {
+    width: 180px; height: 320px;
+    background: var(--phone-bg); color: var(--phone-fg);
+    border-radius: 22px; padding: 14px 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15), inset 0 0 0 3px #292524;
+    display: flex; flex-direction: column;
+    position: relative; overflow: hidden;
+  }
+  .phone.blocked {
+    background: repeating-linear-gradient(45deg, #1c1917, #1c1917 6px, #292524 6px, #292524 12px);
+    color: #a8a29e;
+  }
+  .phone.admin {
+    background: #1e1b4b; color: #e0e7ff;
+  }
+  .phone .bar {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; color: var(--phone-muted); margin-bottom: 10px;
+  }
+  .phone .logo {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: linear-gradient(135deg, #b45309, #78350f);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff;
+  }
+  .phone .icon { width: 14px; height: 14px; opacity: 0.6; }
+  .phone h3 {
+    font-size: 13px; margin: 8px 0 6px; line-height: 1.35;
+  }
+  .phone .tag { font-size: 9px; color: var(--amber); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+  .phone .desc { font-size: 11px; color: var(--phone-muted); line-height: 1.4; }
+
+  .phone .cta {
+    margin-top: auto;
+    background: var(--amber); color: #fff;
+    padding: 8px; border-radius: 8px;
+    text-align: center; font-size: 11px; font-weight: 600;
+  }
+  .phone .cta.ghost { background: transparent; border: 1px solid #44403c; color: var(--phone-muted); }
+  .phone .cta.disabled { background: #44403c; color: #78716c; }
+  .phone .cta.red { background: #7f1d1d; }
+
+  .phone .input-box {
+    background: #1c1917; border: 1px solid #292524;
+    border-radius: 6px; padding: 8px; font-size: 11px; color: var(--phone-muted);
+    margin-bottom: 8px;
+  }
+  .phone .otp-dots {
+    display: flex; gap: 4px; justify-content: center; margin: 8px 0;
+  }
+  .phone .otp-dots span {
+    width: 14px; height: 18px; border-bottom: 2px solid #44403c;
+    display: inline-block; text-align: center; font-size: 13px;
+  }
+  .phone .otp-dots span.filled { border-color: var(--amber); color: var(--phone-fg); }
+
+  .phone .progress {
+    height: 2px; background: #292524; margin: -8px -12px 10px; position: relative;
+  }
+  .phone .progress::after {
+    content: ''; position: absolute; left: 0; top: 0; height: 100%;
+    background: var(--amber);
+  }
+  .phone[data-step="1"] .progress::after { width: 14%; }
+  .phone[data-step="2"] .progress::after { width: 28%; }
+  .phone[data-step="3"] .progress::after { width: 42%; }
+  .phone[data-step="5"] .progress::after { width: 71%; }
+  .phone[data-step="7"] .progress::after { width: 100%; }
+
+  .size-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 6px 0;
+  }
+  .size-grid .box {
+    aspect-ratio: 1; background: #1c1917; border: 1px solid #292524;
+    border-radius: 4px; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--phone-muted);
+  }
+  .size-grid .box.sel { border-color: var(--amber); color: var(--amber); }
+
+  /* 보관함 배치 그리드 */
+  .cab-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px;
+    margin: 6px 0; padding: 4px; background: #1c1917; border-radius: 4px;
+  }
+  .cab {
+    aspect-ratio: 1; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; font-weight: 600;
+  }
+  .cab.open  { background: #14532d; color: #86efac; }
+  .cab.taken {
+    background: repeating-linear-gradient(45deg, #44403c, #44403c 3px, #292524 3px, #292524 6px);
+    color: #78716c; opacity: 0.55;
+  }
+  .cab.sel   { background: var(--amber); color: #fff; box-shadow: 0 0 0 2px #fde68a; }
+  .cab.aisle { background: transparent; color: #57534e; font-size: 7px; opacity: 0.4; }
+
+  /* 실제 매장 배치도 미니맵 */
+  .fp {
+    background: #0c0a09; border: 1px solid #292524;
+    border-radius: 4px; padding: 4px;
+    display: flex; flex-direction: column; gap: 3px;
+    font-size: 5px;
+  }
+  .fp-top { display: flex; justify-content: space-between; align-items: center; height: 12px; gap: 2px; }
+  .fp-mid { display: flex; justify-content: center; align-items: flex-start; gap: 6px; }
+  .fp-bot { display: flex; justify-content: center; gap: 1px; margin-top: 2px; }
+  .fp-group-row { display: flex; gap: 1px; }
+  .fp-block { display: flex; flex-direction: column; gap: 1px; }
+  .fp-door { font-size: 6px; color: #ea580c; padding: 0 3px; white-space: nowrap; }
+  .fp-here { font-size: 5px; color: #dc2626; }
+
+  .fp-m   { width: 8px; height: 11px; background: #14532d; border-radius: 1px; }
+  .fp-m.wide  { width: 16px; }
+  .fp-m.gap   { background: transparent; }
+  .fp-m.taken { background: repeating-linear-gradient(45deg,#44403c,#44403c 2px,#292524 2px,#292524 4px); opacity: 0.55; }
+  .fp-m.sel   { background: var(--amber); box-shadow: 0 0 0 1.5px #fde68a; z-index: 1; position: relative; }
+
+  .fp-l { width: 7px; height: 7px; background: #14532d; border-radius: 1px; }
+  .fp-l.taken { background: repeating-linear-gradient(45deg,#44403c,#44403c 2px,#292524 2px,#292524 4px); opacity: 0.55; }
+
+  .fp-legend { display: flex; justify-content: space-around; gap: 6px; font-size: 8px; color: var(--phone-muted); margin-top: 3px; }
+  .fp-legend span { display: inline-flex; align-items: center; gap: 2px; }
+  .fp-legend i { display: inline-block; width: 6px; height: 6px; border-radius: 1px; }
+
+  /* 사이즈 필터 탭 + 확대 보관함 그리드 (터치 44px+ 확보) */
+  .cab-tab { display: flex; gap: 2px; margin: 3px 0 4px; }
+  .cab-tab .tab {
+    flex: 1; padding: 5px 2px;
+    background: var(--phone-bg); border: 1px solid var(--phone-line);
+    border-radius: 3px; font-size: 8px; font-weight: 500;
+    text-align: center; color: var(--phone-muted);
+  }
+  .cab-tab .tab.active {
+    background: var(--amber); color: #1c1917;
+    border-color: var(--amber); font-weight: 700;
+  }
+  .big-cab-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 3px; margin: 3px 0;
+  }
+  .big-cab {
+    padding: 7px 2px; background: #14532d; border-radius: 3px;
+    font-size: 9px; font-weight: 600; text-align: center;
+    color: #86efac;
+  }
+  .big-cab.taken {
+    background: repeating-linear-gradient(45deg,#44403c,#44403c 3px,#292524 3px,#292524 6px);
+    color: #78716c; opacity: 0.5;
+  }
+  .big-cab.sel {
+    background: var(--amber); color: #1c1917;
+    box-shadow: 0 0 0 1.5px #fde68a; font-weight: 700;
+  }
+
+  /* 미니맵 (매장 위치 힌트) */
+  .mini-fp-wrap {
+    margin-top: 4px; padding: 3px 4px;
+    background: #0c0a09; border: 1px dashed var(--phone-line);
+    border-radius: 3px;
+  }
+  .mini-fp-label { font-size: 7px; color: var(--phone-muted); margin-bottom: 1px; text-align: center; }
+  .mini-fp { display: block; width: 100%; height: auto; }
+
+  /* Toss 스타일 이름 입력 강조 */
+  .greet-prefix { font-size: 11px; color: var(--phone-muted); margin-bottom: 2px; }
+  .slide-hint { font-size: 10px; color: var(--amber); margin: 4px 0; }
+  .input-box.active { border-color: var(--amber); color: var(--phone-fg); }
+  .caret::after { content: ''; display: inline-block; width: 1px; height: 10px; background: var(--amber); margin-left: 2px; vertical-align: middle; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .summary-row {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--phone-muted); padding: 3px 0;
+    border-bottom: 1px dashed #292524;
+  }
+  .summary-row.total { color: var(--phone-fg); font-weight: 600; margin-top: 4px; border-bottom: 0; }
+
+  .big-num {
+    font-size: 28px; text-align: center; color: var(--amber); letter-spacing: 4px;
+    font-weight: 700; margin: 12px 0;
+  }
+
+  .blocked-msg {
+    margin: auto; text-align: center; font-size: 12px;
+    background: rgba(220,38,38,0.15); border: 1px dashed #7f1d1d;
+    color: #fca5a5; padding: 14px 10px; border-radius: 8px;
+  }
+
+  /* 문제 카드 섹션 */
+  .card-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px; margin-top: 14px;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+  }
+  .card .title { font-weight: 600; margin-bottom: 4px; font-size: 14px; }
+  .card .meta { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .card .body { font-size: 13px; color: var(--fg); }
+  .pri { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-right: 4px; }
+  .pri.high { background: #fee2e2; color: #7f1d1d; }
+  .pri.mid  { background: #fef3c7; color: #78350f; }
+  .pri.low  { background: #e7e5e4; color: #44403c; }
+
+  .how-to {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 18px; margin: 20px 0;
+  }
+  .how-to ol { margin: 8px 0 0; padding-left: 20px; }
+  .how-to li { margin: 6px 0; font-size: 14px; }
+
+  footer { color: var(--muted); font-size: 11px; margin-top: 36px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>HAAM UX 지도 — 스토리보드</h1>
+  <p class="lead">이 페이지는 <b>고객이 실제로 보는 화면</b>을 순서대로 늘어놓은 그림 지도입니다.<br/>각 핸드폰 미니어처 = 고객이 마주치는 한 화면.</p>
+
+  <div class="note">
+    <b>어떻게 읽나?</b> 위에서 아래로 3개의 이야기(신규 예약 · 재방문 · 해지)가 있습니다. 각 이야기는 핸드폰 그림 여러 개가 화살표로 이어져 있어요. 회색 빗금 그림 = 아직 안 만든 화면, 파란 그림 = 관리자용.
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <h2>
+    <span class="dot green"></span>
+    이야기 ① 신규 고객이 예약하기까지
+    <span class="badge ok">현재 잘 됨</span>
+  </h2>
+  <p class="story-sub">처음 방문한 손님이 홈 → 로그인 → 보관함 예약 → 완료까지 겪는 7~8개 화면.</p>
+
+  <div class="storyboard">
+
+    <div class="step">
+      <div class="phone">
+        <div class="bar"><span></span><span></span><span></span></div>
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+          <div style="font-size:9px; color:var(--amber); letter-spacing:2px;">HAAM</div>
+          <h3 style="margin:6px 0 4px;">숭실대입구<br/>도보 3분</h3>
+          <div class="desc">월 7만원부터<br/>24시간 QR 출입</div>
+        </div>
+        <div class="cta">시작하기</div>
+      </div>
+      <div class="label"><span class="dot green"></span> 홈 (스플래시)</div>
+      <div class="sub-label">자동 슬라이드 3장</div>
+    </div>
+
+    <div class="step">
+      <div class="phone">
+        <div class="bar">←<span></span><span></span></div>
+        <div class="tag">LOGIN · 1/3</div>
+        <h3>어떻게<br/>불러드릴까요?</h3>
+        <div class="input-box active">이름 입력<span class="caret"></span></div>
+        <div class="desc" style="font-size:10px;">실명으로 적어주세요</div>
+        <div class="cta disabled">다음</div>
+      </div>
+      <div class="label"><span class="dot green"></span> 이름 먼저</div>
+      <div class="sub-label">Toss 스타일 — 한 번에 하나만 물어봄</div>
+    </div>
+
+    <div class="step">
+      <div class="phone">
+        <div class="bar">←<span></span><span></span></div>
+        <div class="tag">LOGIN · 2/3</div>
+        <div class="greet-prefix">홍길동님 👋</div>
+        <h3 style="margin-top:2px;">전화번호를<br/>알려주세요</h3>
+        <div class="slide-hint">↓ 이름 입력 후 자연스럽게 등장</div>
+        <div class="input-box active">010-1234-5678<span class="caret"></span></div>
+        <div class="desc" style="font-size:10px;">카카오톡으로 인증번호가<br/>전송됩니다</div>
+        <div class="cta">인증번호 받기</div>
+      </div>
+      <div class="label"><span class="dot green"></span> 번호 슬라이드 인</div>
+      <div class="sub-label">한 화면에 다 보여주지 말고<br/>말 걸듯 점진 표시</div>
+    </div>
+
+    <div class="step">
+      <div class="phone">
+        <div class="bar">←<span></span><span></span></div>
+        <div class="tag">LOGIN · 3/3</div>
+        <div class="greet-prefix">홍길동님,</div>
+        <h3 style="margin-top:2px;">문자로 보낸<br/>번호를 입력해주세요</h3>
+        <div class="otp-dots">
+          <span class="filled">3</span>
+          <span class="filled">8</span>
+          <span class="filled">4</span>
+          <span class="filled">7</span>
+          <span>·</span>
+          <span>·</span>
+        </div>
+        <div class="desc" style="font-size:10px; text-align:center;">카톡 못 받으셨어요?<br/>SMS로 재발송</div>
+        <div class="cta">확인</div>
+      </div>
+      <div class="label"><span class="dot green"></span> OTP 확인</div>
+      <div class="sub-label">6자리 인증 — 인증 성공 후<br/>기존 회원이면 바로 홈으로</div>
+    </div>
+
+    <div class="step">
+      <div class="phone" data-step="1">
+        <div class="bar">←<span></span>⎋</div>
+        <div class="progress"></div>
+        <div class="tag">STEP 1 / 7</div>
+        <h3>사이즈 선택</h3>
+        <div class="size-grid">
+          <div class="box">M<br/>₩7만</div>
+          <div class="box sel">L<br/>₩12만</div>
+          <div class="box">XL<br/>₩20만</div>
+          <div class="box" style="font-size:9px;">비교</div>
+        </div>
+        <div class="cta">다음</div>
+      </div>
+      <div class="label"><span class="dot green"></span> 사이즈 선택</div>
+      <div class="sub-label">M·L·XL 중 하나</div>
+    </div>
+
+    <div class="step">
+      <div class="phone" data-step="2">
+        <div class="bar">←<span></span>⎋</div>
+        <div class="progress"></div>
+        <div class="tag">STEP 2 / 7</div>
+        <h3 style="margin-bottom:2px;">보관함 고르기</h3>
+
+        <!-- 사이즈 필터 탭 (1단계에서 선택한 L이 기본 활성) -->
+        <div class="cab-tab">
+          <div class="tab">M·46</div>
+          <div class="tab active">L·13</div>
+          <div class="tab">XL·2</div>
+        </div>
+
+        <!-- 확대된 3열 그리드 (선택 사이즈만 — 터치 타깃 확보) -->
+        <div class="big-cab-grid">
+          <div class="big-cab">L01</div>
+          <div class="big-cab">L02</div>
+          <div class="big-cab taken">L03</div>
+          <div class="big-cab">L04</div>
+          <div class="big-cab">L05</div>
+          <div class="big-cab">L06</div>
+          <div class="big-cab sel">L07</div>
+          <div class="big-cab">L08</div>
+          <div class="big-cab taken">L09</div>
+          <div class="big-cab">L10</div>
+          <div class="big-cab">L11</div>
+          <div class="big-cab">L12</div>
+          <div class="big-cab">L13</div>
+        </div>
+
+        <div class="fp-legend" style="margin-top:2px;">
+          <span><i style="background:#14532d;"></i>가능</span>
+          <span><i style="background:#44403c;"></i>사용중</span>
+          <span><i style="background:var(--amber);"></i>선택</span>
+        </div>
+
+        <!-- 미니맵: 매장 속 선택 위치 -->
+        <div class="mini-fp-wrap">
+          <div class="mini-fp-label">📍 매장 속 내 위치</div>
+          <svg class="mini-fp" viewBox="0 0 100 52" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1" y="1" width="98" height="50" fill="none" stroke="#44403c" rx="2"/>
+            <text x="50" y="8" font-size="5" fill="#57534e" text-anchor="middle">▼입구</text>
+            <rect x="6" y="13" width="36" height="13" fill="#292524" rx="1"/>
+            <rect x="58" y="13" width="36" height="13" fill="#292524" rx="1"/>
+            <text x="24" y="22" font-size="4" fill="#57534e" text-anchor="middle">M</text>
+            <text x="76" y="22" font-size="4" fill="#57534e" text-anchor="middle">M</text>
+            <rect x="6" y="35" width="88" height="10" fill="#14532d" rx="1"/>
+            <text x="14" y="42" font-size="4" fill="#86efac" text-anchor="middle">L</text>
+            <circle cx="50" cy="40" r="3.2" fill="#fbbf24" stroke="#fde68a" stroke-width="0.8"/>
+            <text x="50" y="41.8" font-size="3.5" fill="#1c1917" text-anchor="middle" font-weight="700">L7</text>
+          </svg>
+        </div>
+
+        <div class="cta">L07 선택하기</div>
+      </div>
+      <div class="label"><span class="dot green"></span> 보관함 선택 (사이즈 필터 + 미니맵)</div>
+      <div class="sub-label">사이즈 탭 → 큰 버튼(44px+)으로 선택<br/>아래 미니맵이 매장 속 위치 확인</div>
+    </div>
+
+    <div class="step">
+      <div class="phone" data-step="3">
+        <div class="bar">←<span></span>⎋</div>
+        <div class="progress"></div>
+        <div class="tag">STEP 3 / 7</div>
+        <h3>기간 선택</h3>
+        <div style="display:flex; flex-direction:column; gap:4px; margin:6px 0;">
+          <div class="input-box" style="padding:6px;">1개월</div>
+          <div class="input-box" style="padding:6px; border-color:var(--amber); color:var(--amber);">6개월 · 15% 할인</div>
+          <div class="input-box" style="padding:6px;">12개월 · 20% 할인</div>
+        </div>
+        <div class="cta">다음</div>
+      </div>
+      <div class="label"><span class="dot green"></span> 기간·할인</div>
+      <div class="sub-label">장기일수록 할인 커짐</div>
+    </div>
+
+    <div class="step">
+      <div class="phone" data-step="5">
+        <div class="bar">←<span></span>⎋</div>
+        <div class="progress"></div>
+        <div class="tag">STEP 5 / 7</div>
+        <h3>결제하기</h3>
+        <div class="summary-row"><span>월 이용료</span><span>₩102,000</span></div>
+        <div class="summary-row"><span>보증금</span><span>₩120,000</span></div>
+        <div class="summary-row total"><span>합계</span><span>₩222,000</span></div>
+        <div class="input-box" style="margin-top:8px; text-align:center;">💳 토스페이먼츠</div>
+        <div class="cta">결제하기</div>
+      </div>
+      <div class="label"><span class="dot green"></span> 결제</div>
+      <div class="sub-label">토스페이먼츠 위젯</div>
+    </div>
+
+    <div class="step">
+      <div class="phone" data-step="7">
+        <div class="bar"><span></span><span></span><span></span></div>
+        <div class="progress"></div>
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+          <div style="font-size:26px;">✅</div>
+          <h3 style="margin-top:8px;">예약 완료!</h3>
+          <div class="desc" style="font-size:10px;">보안코드</div>
+          <div class="big-num" style="font-size:22px; margin:6px 0;">38472</div>
+          <div class="desc" style="font-size:9px;">카톡으로도<br/>전송됐습니다</div>
+        </div>
+        <div class="cta ghost">마이페이지</div>
+      </div>
+      <div class="label"><span class="dot green"></span> 완료 + 알림톡</div>
+      <div class="sub-label">보안코드 5자리</div>
+    </div>
+
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <h2>
+    <span class="dot green"></span>
+    이야기 ② 재방문 고객이 계약을 확인하기까지
+    <span class="badge ok">현재 잘 됨</span>
+  </h2>
+  <p class="story-sub">알림톡으로 받은 링크를 눌러 마이페이지에 들어가서 보안코드나 만료일을 확인.</p>
+
+  <div class="storyboard">
+
+    <div class="step">
+      <div class="phone" style="background:#fae8d4; color:#1c1917;">
+        <div class="bar" style="color:#78716c;"><span>💬 카카오톡</span><span>14:30</span></div>
+        <div style="background:#fff; border-radius:10px; padding:10px; font-size:11px; margin-top:6px;">
+          <div style="font-weight:700; color:#b45309; margin-bottom:4px;">[HAAM] 계약 안내</div>
+          <div style="color:#44403c; line-height:1.4;">
+            홍길동님<br/>
+            보관함: L-03<br/>
+            만료: 2026-10-15
+          </div>
+          <div style="margin-top:8px; color:#b45309; text-decoration:underline; font-size:10px;">계약 상세 보기 →</div>
+        </div>
+        <div style="margin-top:auto; font-size:10px; color:#78716c; text-align:center;">링크 탭</div>
+      </div>
+      <div class="label"><span class="dot green"></span> 알림톡 수신</div>
+      <div class="sub-label">토큰 URL 포함</div>
+    </div>
+
+    <div class="step">
+      <div class="phone">
+        <div class="bar"><span></span><span>⎋</span></div>
+        <h3 style="margin-top:4px;">홍길동님</h3>
+        <div class="summary-row"><span>보관함</span><span>L-03</span></div>
+        <div class="summary-row"><span>상태</span><span style="color:var(--green);">이용 중</span></div>
+        <div class="summary-row"><span>만료</span><span>D-182</span></div>
+        <div style="margin:8px 0 4px; font-size:10px; color:var(--phone-muted);">보안코드</div>
+        <div class="big-num" style="font-size:22px; margin:4px 0;">38472</div>
+        <div class="cta ghost" style="margin-top:6px;">재계약 / 환불</div>
+      </div>
+      <div class="label"><span class="dot green"></span> 마이페이지</div>
+      <div class="sub-label">계약 + 보안코드</div>
+    </div>
+
+    <div class="step" style="justify-content:center; padding-top:120px;">
+      <div style="font-size:13px; color:var(--muted); max-width:160px; text-align:center;">
+        확인 끝.<br/>
+        재계약/환불 버튼을 누르면 👉 이야기③
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <h2>
+    <span class="dot red"></span>
+    이야기 ③ 해지하려는 고객 — <u>지금은 막혀있음</u>
+    <span class="badge bad">사용 불가</span>
+  </h2>
+  <p class="story-sub">마이페이지에서 "환불" 눌러도 빈 페이지가 뜸. 재계약·공동사용자 초대도 같은 상태.</p>
+
+  <div class="storyboard">
+
+    <div class="step">
+      <div class="phone">
+        <div class="bar"><span></span><span>⎋</span></div>
+        <h3 style="margin-top:4px;">홍길동님</h3>
+        <div class="summary-row"><span>만료</span><span>D-3</span></div>
+        <div style="margin-top:auto;"></div>
+        <div class="cta">재계약</div>
+        <div class="cta red" style="margin-top:4px;">해지·환불</div>
+      </div>
+      <div class="label"><span class="dot green"></span> 마이페이지</div>
+      <div class="sub-label">버튼은 있음</div>
+    </div>
+
+    <div class="step">
+      <div class="phone blocked">
+        <div class="blocked-msg">
+          🚧<br/>
+          이 화면<br/>아직 안 만들어짐<br/><br/>
+          <span style="color:#7f1d1d;">/refund/:token</span>
+        </div>
+      </div>
+      <div class="label"><span class="dot red"></span> 환불 화면</div>
+      <div class="sub-label" style="color:var(--red);">구멍 · 우선순위 높음</div>
+    </div>
+
+    <div class="step" style="padding-top:130px;">
+      <div style="font-size:12px; color:var(--muted); max-width:180px; text-align:center;">
+        → 고객은 여기서<br/>막혀서 전화 문의.<br/>
+        <b style="color:var(--red);">지금 가장 큰 구멍.</b>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <h2>관리자용 화면 (운영자 전용)</h2>
+  <p class="story-sub">현재 대시보드 1개만 있고, 개별 계약 관리·프로모션 토글은 아직 없음.</p>
+
+  <div class="storyboard">
+
+    <div class="step">
+      <div class="phone admin">
+        <div class="bar" style="color:#a5b4fc;"><span>ADMIN</span><span>⚙</span></div>
+        <h3 style="color:#e0e7ff;">대시보드</h3>
+        <div class="summary-row" style="color:#a5b4fc; border-color:#312e81;"><span>이용 중</span><span>14</span></div>
+        <div class="summary-row" style="color:#a5b4fc; border-color:#312e81;"><span>가용</span><span>6</span></div>
+        <div class="summary-row" style="color:#a5b4fc; border-color:#312e81;"><span>D-7 만료</span><span>3</span></div>
+        <div class="summary-row total" style="color:#e0e7ff;"><span>이번 달 매출</span><span>₩1.4M</span></div>
+        <div class="cta ghost" style="margin-top:6px; color:#a5b4fc; border-color:#312e81;">계약 목록</div>
+      </div>
+      <div class="label"><span class="dot orange"></span> 대시보드</div>
+      <div class="sub-label" style="color:var(--orange);">⚠ 누구나 접근 가능</div>
+    </div>
+
+    <div class="step">
+      <div class="phone blocked">
+        <div class="blocked-msg">
+          🚧<br/>
+          계약 관리<br/>아직 없음<br/><br/>
+          <span style="color:#7f1d1d;">/admin/contracts</span>
+        </div>
+      </div>
+      <div class="label"><span class="dot red"></span> 계약 관리</div>
+      <div class="sub-label" style="color:var(--red);">운영자 일상 업무</div>
+    </div>
+
+    <div class="step">
+      <div class="phone blocked">
+        <div class="blocked-msg">
+          🚧<br/>
+          프로모션<br/>아직 없음<br/><br/>
+          <span style="color:#7f1d1d;">/admin/promotions</span>
+        </div>
+      </div>
+      <div class="label"><span class="dot red"></span> 프로모션</div>
+      <div class="sub-label">코드로 하드코딩 중</div>
+    </div>
+
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <h2>요약: 지금 상태를 한 줄로</h2>
+  <div class="card-grid">
+    <div class="card">
+      <div class="title">🟢 잘 되는 것 (6개)</div>
+      <div class="body" style="font-size:13px;">홈, /about, 로그인, OTP, 예약 7단계, 마이페이지(알림톡 링크)</div>
+    </div>
+    <div class="card">
+      <div class="title">🔴 빈 화면 (5개)</div>
+      <div class="body" style="font-size:13px;">재계약, <b>환불</b>, 공동사용자 초대, 관리자 계약 관리, 프로모션</div>
+    </div>
+    <div class="card">
+      <div class="title">🟠 숨은 함정 (3개)</div>
+      <div class="body" style="font-size:13px;">관리자 인증 없음, 마이페이지가 토큰 링크 전용(북마크 불가), 자동로그인 90일</div>
+    </div>
+  </div>
+
+  <h2>이번 주에 할 것을 고를 때 — 추천 순서</h2>
+  <div class="card-grid">
+    <div class="card">
+      <div class="meta"><span class="pri high">이번 주</span></div>
+      <div class="title">1) 환불 화면 만들기</div>
+      <div class="body" style="font-size:13px;">고객이 막히면 전화로 문의함 = 가장 비용 큰 구멍.</div>
+    </div>
+    <div class="card">
+      <div class="meta"><span class="pri high">이번 주</span></div>
+      <div class="title">2) 관리자 페이지에 비밀번호</div>
+      <div class="body" style="font-size:13px;">URL만 알면 누구나 들어가는 상태. 최소한 쿠키 하나라도.</div>
+    </div>
+    <div class="card">
+      <div class="meta"><span class="pri mid">다음 주</span></div>
+      <div class="title">3) 재계약 화면</div>
+      <div class="body" style="font-size:13px;">D-7 알림톡에서 링크 누르면 가는 곳. 자동 갱신 대체.</div>
+    </div>
+  </div>
+
+  <div class="how-to">
+    <div style="font-weight:600; margin-bottom:4px;">📌 이 지도 활용법</div>
+    <ol>
+      <li>새 UX 이슈 발견 → 이 HTML 더블클릭해서 해당 화면이 어디에 있나 먼저 확인</li>
+      <li>주 1회 Claude에게: <b>"UX 지도 보면서 이번 주 3개만 뽑아줘"</b></li>
+      <li>단건 반응형 수정 대신 <b>"이번 주 묶음"</b> 단위로 개선</li>
+      <li>새 화면 만들면 Claude에게: <b>"UX 지도에 반영해줘"</b> → 이 파일 갱신</li>
+    </ol>
+  </div>
+
+  <footer>최종 갱신: 2026-04-19 · Round 1.1 (보관함 선택 UX 개선 — 사이즈 필터 + 확대 그리드 + 미니맵) · 수정은 Claude에게 "ux-map 업데이트" 요청</footer>
+</div>
+</body>
+</html>
