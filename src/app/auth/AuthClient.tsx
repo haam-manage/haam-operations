@@ -52,6 +52,14 @@ export default function AuthClient({ redirectTo }: Props) {
     if (stage === 'name') setTimeout(() => nameInputRef.current?.focus(), 400);
   }, [stage]);
 
+  // OTP 6자리 입력 완료 시 자동 검증 (stale closure 방지)
+  useEffect(() => {
+    if (otp.length === 6 && stage === 'otp' && !loading) {
+      handleVerifyOtp();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otp, stage]);
+
   // 전화번호 입력 후 OTP 발송
   const handleSendOtp = async () => {
     const cleanPhone = phone.replace(/\D/g, '');
@@ -346,7 +354,6 @@ export default function AuthClient({ redirectTo }: Props) {
                     onChange={e => {
                       const v = e.target.value.replace(/\D/g, '').slice(0, 6);
                       setOtp(v);
-                      if (v.length === 6) setTimeout(handleVerifyOtp, 100);
                     }}
                     placeholder="000000"
                     className="input-dark text-center text-3xl tracking-[0.5em] font-mono"
