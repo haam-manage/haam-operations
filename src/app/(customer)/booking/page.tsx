@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { Check, CreditCard, Lock, ChevronRight, Package, Clock, Calendar, User, Phone, Mail } from 'lucide-react';
 import { toast } from 'sonner';
@@ -52,6 +52,21 @@ export default function BookingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [orderResult, setOrderResult] = useState<{ orderId: string } | null>(null);
+  const [availability, setAvailability] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    fetch('/api/cabinets')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.cabinets) return;
+        const map: Record<string, boolean> = {};
+        for (const c of data.cabinets as { number: string; isAvailable: boolean }[]) {
+          map[c.number] = c.isAvailable;
+        }
+        setAvailability(map);
+      })
+      .catch(() => {});
+  }, []);
 
   const goTo = useCallback((s: Step, dir: 'forward' | 'back' = 'forward') => {
     setDirection(dir);
@@ -125,7 +140,17 @@ export default function BookingPage() {
 
   // ─── Step 2: Cabinet Number ───
   if (step === 2) {
-    const nums = selectedSize ? getCabinetNumbers(selectedSize) : [];
+    const activeSize: CabinetSize = selectedSize ?? 'M';
+    const nums = getCabinetNumbers(activeSize);
+    const availableCount = nums.filter(n => availability[n] !== false).length;
+
+    const switchSize = (size: CabinetSize) => {
+      if (size === selectedSize) return;
+      setSelectedSize(size);
+      setSelectedCabinet('');
+      haptic();
+    };
+
     return (
       <StepLayout
         step={2} totalSteps={7}
@@ -135,27 +160,79 @@ export default function BookingPage() {
         direction={direction}
         bottomCTA={
           <Button variant="primary" className="w-full py-4 text-base" disabled={!selectedCabinet} onClick={() => goTo(3)}>
-            다음
+            {selectedCabinet ? `${selectedCabinet} 선택 · 다음` : '보관함을 고르세요'}
             <ChevronRight className="w-5 h-5" />
           </Button>
         }
       >
-        <p className="text-xs text-stone-500 mb-4">{selectedSize && SIZE_INFO[selectedSize].name} · {nums.length}개 보관함</p>
-        <div className="grid grid-cols-4 gap-2.5">
-          {nums.map(num => (
-            <button
-              key={num}
-              onClick={() => { setSelectedCabinet(num); haptic(); }}
-              className={`py-3.5 rounded-xl text-sm font-mono font-medium transition-all duration-150 touch-target ${
-                selectedCabinet === num
-                  ? 'bg-amber-900/25 text-amber-500 border border-amber-700/30'
-                  : 'bg-white/3 text-stone-500 border border-white/5 active:bg-white/6'
-              }`}
-            >
-              {num}
-            </button>
-          ))}
+        {/* 사이즈 필터 탭 */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {(['M', 'L', 'XL'] as CabinetSize[]).map(size => {
+            const total = size === 'M' ? 46 : size === 'L' ? 13 : 2;
+            const available = getCabinetNumbers(size).filter(n => availability[n] !== false).length;
+            const active = activeSize === size;
+            return (
+              <button
+                key={size}
+                onClick={() => switchSize(size)}
+                className={`py-3 rounded-xl text-center transition-all duration-150 touch-target ${
+                  active
+                    ? 'bg-amber-900/30 border border-amber-700/40 text-amber-400'
+                    : 'bg-white/3 border border-white/5 text-stone-400 active:bg-white/6'
+                }`}
+              >
+                <div className="text-sm font-bold">{SIZE_INFO[size].name}</div>
+                <div className={`text-[10px] mt-0.5 ${active ? 'text-amber-500/80' : 'text-stone-600'}`}>
+                  {size} · {available}/{total}
+                </div>
+              </button>
+            );
+          })}
         </div>
+
+        <p className="text-xs text-stone-500 mb-3">
+          남은 보관함 <span className="text-amber-500 font-semibold">{availableCount}</span>/{nums.length}
+        </p>
+
+        {/* 확대 3열 그리드 — 터치 타깃 48px+ */}
+        <div className="grid grid-cols-3 gap-2.5 mb-5">
+          {nums.map(num => {
+            const isTaken = availability[num] === false;
+            const isSel = selectedCabinet === num;
+            return (
+              <button
+                key={num}
+                disabled={isTaken}
+                onClick={() => { setSelectedCabinet(num); haptic(); }}
+                className={`py-4 rounded-xl text-base font-mono font-semibold transition-all duration-150 min-h-[56px] ${
+                  isSel
+                    ? 'bg-amber-600 text-black shadow-[0_0_0_2px_rgba(251,191,36,0.4)]'
+                    : isTaken
+                      ? 'bg-stone-800/60 text-stone-600 cursor-not-allowed line-through'
+                      : 'bg-green-900/30 border border-green-800/30 text-green-400 active:bg-green-900/50'
+                }`}
+              >
+                {num}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 범례 */}
+        <div className="flex justify-around text-[11px] text-stone-500 mb-4">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-green-900/60 border border-green-800/40" />가능
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-stone-800" />사용중
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-amber-600" />선택
+          </span>
+        </div>
+
+        {/* 미니맵 — 매장 속 선택 위치 */}
+        <CabinetMinimap selectedSize={activeSize} selectedCabinet={selectedCabinet} />
       </StepLayout>
     );
   }
@@ -450,4 +527,99 @@ function calculateEstimate(monthlyPrice: number, months: number): number {
   const rate = discountRates[months] ?? 0;
   const rental = Math.round(monthlyPrice * months * (1 - rate));
   return rental + monthlyPrice; // rental + deposit
+}
+
+/* ─── 매장 미니맵 (숭실대입구점) ─── */
+function CabinetMinimap({ selectedSize, selectedCabinet }: { selectedSize: CabinetSize; selectedCabinet: string }) {
+  // 각 사이즈의 존 좌표 (viewBox 100×64 기준)
+  const marker = getMarkerPosition(selectedCabinet);
+  const mActive = selectedSize === 'M';
+  const lActive = selectedSize === 'L';
+  const xActive = selectedSize === 'XL';
+
+  const dim = '#292524';
+  const active = '#14532d';
+  const amber = '#fbbf24';
+
+  return (
+    <div className="p-3 rounded-xl bg-stone-950/60 border border-white/5">
+      <p className="text-[11px] text-stone-500 text-center mb-2">📍 매장 속 내 위치</p>
+      <svg viewBox="0 0 100 64" className="w-full h-auto" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="98" height="62" fill="none" stroke="#44403c" rx="2" />
+        <text x="50" y="8" fontSize="4.5" fill="#57534e" textAnchor="middle">▼ 입구</text>
+
+        {/* 상단: XL02(좌), XL01(우) + 주변 M */}
+        <rect x="4"  y="12" width="14" height="7" fill={xActive ? active : dim} rx="1" />
+        <text x="11" y="17.5" fontSize="3.5" fill={xActive ? '#86efac' : '#57534e'} textAnchor="middle">XL2</text>
+        <rect x="82" y="12" width="14" height="7" fill={xActive ? active : dim} rx="1" />
+        <text x="89" y="17.5" fontSize="3.5" fill={xActive ? '#86efac' : '#57534e'} textAnchor="middle">XL1</text>
+        <rect x="20" y="12" width="28" height="7" fill={mActive ? active : dim} rx="1" />
+        <rect x="52" y="12" width="28" height="7" fill={mActive ? active : dim} rx="1" />
+
+        {/* 중앙: 좌블록 + 우블록 (M) */}
+        <rect x="6"  y="24" width="40" height="20" fill={mActive ? active : dim} rx="1" />
+        <text x="26" y="36" fontSize="5" fill={mActive ? '#86efac' : '#57534e'} textAnchor="middle">M</text>
+        <rect x="54" y="24" width="40" height="20" fill={mActive ? active : dim} rx="1" />
+        <text x="74" y="36" fontSize="5" fill={mActive ? '#86efac' : '#57534e'} textAnchor="middle">M</text>
+
+        {/* 하단: L 13개 라인 */}
+        <rect x="4" y="50" width="92" height="10" fill={lActive ? active : dim} rx="1" />
+        <text x="8" y="57" fontSize="4" fill={lActive ? '#86efac' : '#57534e'} textAnchor="middle">L</text>
+
+        {/* 선택된 보관함 마커 */}
+        {marker && selectedCabinet && (
+          <>
+            <circle cx={marker.x} cy={marker.y} r="3.8" fill={amber} stroke="#fde68a" strokeWidth="0.8" />
+            <text x={marker.x} y={marker.y + 1.5} fontSize="3" fill="#1c1917" textAnchor="middle" fontWeight="700">
+              {selectedCabinet.replace(/^(M|L|XL)0?/, '')}
+            </text>
+          </>
+        )}
+      </svg>
+      {selectedCabinet && (
+        <p className="text-[11px] text-amber-500 text-center mt-2 font-medium">{selectedCabinet} 위치</p>
+      )}
+    </div>
+  );
+}
+
+function getMarkerPosition(num: string): { x: number; y: number } | null {
+  if (!num) return null;
+  if (num.startsWith('XL')) {
+    const n = parseInt(num.slice(2), 10);
+    return n === 1 ? { x: 89, y: 15.5 } : { x: 11, y: 15.5 };
+  }
+  if (num.startsWith('L')) {
+    const n = parseInt(num.slice(1), 10);
+    // L01 = 오른쪽 끝, L13 = 왼쪽 끝
+    const x = 92 - ((n - 1) / 12) * 84;
+    return { x, y: 55 };
+  }
+  if (num.startsWith('M')) {
+    const n = parseInt(num.slice(1), 10);
+    // M01~M10: 우블록 윗줄 / M11~M20: 좌블록 윗줄 / M21~M26: 상단 좌
+    // M27~M34: 우블록 아랫줄 / M35~M46: 좌블록 아랫줄
+    if (n >= 1 && n <= 10) {
+      // 우블록 윗줄 (y≈28)
+      const col = (n - 1) % 5;
+      return { x: 60 + col * 8, y: 29 };
+    }
+    if (n >= 11 && n <= 20) {
+      const col = (n - 11) % 5;
+      return { x: 10 + col * 8, y: 29 };
+    }
+    if (n >= 21 && n <= 26) {
+      const col = (n - 21) % 6;
+      return { x: 22 + col * 4.5, y: 15.5 };
+    }
+    if (n >= 27 && n <= 34) {
+      const col = (n - 27) % 4;
+      return { x: 60 + col * 8, y: 39 };
+    }
+    if (n >= 35 && n <= 46) {
+      const col = (n - 35) % 6;
+      return { x: 10 + col * 6, y: 39 };
+    }
+  }
+  return null;
 }
