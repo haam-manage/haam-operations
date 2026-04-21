@@ -93,16 +93,19 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
       const widgets = tossPayments.widgets({ customerKey: customerId });
       await widgets.setAmount({ currency: 'KRW', value: priceBreakdown.totalAmount });
       await Promise.all([
-        widgets.renderPaymentMethods({ selector: '#toss-payment-methods', variantKey: 'DEFAULT' }),
-        widgets.renderAgreement({ selector: '#toss-agreement', variantKey: 'AGREEMENT' }),
+        widgets.renderPaymentMethods({ selector: '#toss-payment-methods' }),
+        widgets.renderAgreement({ selector: '#toss-agreement' }),
       ]);
       if (cancelled) return;
 
       widgetsRef.current = widgets;
       setWidgetsReady(true);
     })().catch((err) => {
-      console.error('[Toss widgets] 초기화 실패', err);
-      if (!cancelled) toast.error('결제 위젯 로드에 실패했습니다');
+      const detail = err instanceof Error
+        ? `${err.name}: ${err.message}`
+        : String(err);
+      console.error('[Toss widgets] 초기화 실패', { detail, err });
+      if (!cancelled) toast.error(`결제 위젯 로드 실패 — ${detail}`);
     });
 
     return () => { cancelled = true; };
