@@ -125,8 +125,8 @@ export default async function AdminDashboard() {
 
         {/* Nav */}
         <div className="grid grid-cols-2 gap-3">
-          <NavCard href="/admin/contracts" icon={<Users className="w-5 h-5" />} label="계약 관리" />
-          <NavCard href="/admin/promotions" icon={<Gift className="w-5 h-5" />} label="프로모션" />
+          <NavCard href="/contracts" icon={<Users className="w-5 h-5" />} label="계약 관리" />
+          <NavCard href="/promotions" icon={<Gift className="w-5 h-5" />} label="프로모션" disabled />
           <NavCard href="/api/cron/daily" icon={<Play className="w-5 h-5" />} label="배치 실행" />
           <NavCard href="/api/health" icon={<Activity className="w-5 h-5" />} label="시스템 상태" />
         </div>
@@ -154,7 +154,18 @@ function StatCard({ icon, label, value, color, highlight }: { icon: React.ReactN
   );
 }
 
-function NavCard({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+function NavCard({ href, icon, label, disabled }: { href: string; icon: React.ReactNode; label: string; disabled?: boolean }) {
+  if (disabled) {
+    return (
+      <div className="glass p-4 flex items-center justify-between opacity-50 cursor-not-allowed">
+        <div className="flex items-center gap-3">
+          <span className="text-stone-600">{icon}</span>
+          <span className="text-sm font-medium text-stone-400">{label}</span>
+        </div>
+        <span className="text-[10px] text-stone-600 uppercase tracking-wider">준비중</span>
+      </div>
+    );
+  }
   return (
     <Link href={href} className="glass glass-hover p-4 flex items-center justify-between group touch-target">
       <div className="flex items-center gap-3">
