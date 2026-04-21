@@ -62,6 +62,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, expiresIn: 180, channel: 'sms' });
   } catch (error) {
     console.error('[send-otp] Error:', error);
-    return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 });
+    const debug = process.env.VERCEL_ENV !== 'production'
+      ? { detail: error instanceof Error ? error.message : String(error) }
+      : {};
+    return NextResponse.json({ error: '서버 오류가 발생했습니다', ...debug }, { status: 500 });
   }
 }

@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('[check-exists] Error:', error);
-    return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 });
+    const debug = process.env.VERCEL_ENV !== 'production'
+      ? { detail: error instanceof Error ? error.message : String(error) }
+      : {};
+    return NextResponse.json({ error: '서버 오류가 발생했습니다', ...debug }, { status: 500 });
   }
 }
