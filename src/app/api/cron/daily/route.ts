@@ -14,9 +14,12 @@ import { notifyEvent, sendDailySummary } from '../../../../../lib/telegram';
  * (UTC 00:00 = KST 09:00)
  */
 export async function GET(request: Request) {
-  // Vercel Cron 인증 (선택)
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 503 });
+  }
   const authHeader = request.headers.get('authorization');
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

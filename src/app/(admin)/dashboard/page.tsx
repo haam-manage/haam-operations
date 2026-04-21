@@ -3,7 +3,7 @@ import { contracts, payments, cabinets, alimtalkLogs } from '../../../../db/sche
 import { eq, count } from 'drizzle-orm';
 import Link from 'next/link';
 import Image from 'next/image';
-import { LayoutDashboard, CreditCard, MessageSquare, Users, Gift, Play, Activity, ChevronRight, Box, AlertTriangle, Clock, CheckCircle, RefreshCw } from 'lucide-react';
+import { CreditCard, MessageSquare, Users, Gift, ChevronRight, Box, AlertTriangle, Clock, CheckCircle, RefreshCw } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -127,8 +127,6 @@ export default async function AdminDashboard() {
         <div className="grid grid-cols-2 gap-3">
           <NavCard href="/contracts" icon={<Users className="w-5 h-5" />} label="계약 관리" />
           <NavCard href="/promotions" icon={<Gift className="w-5 h-5" />} label="프로모션" disabled />
-          <NavCard href="/api/cron/daily" icon={<Play className="w-5 h-5" />} label="배치 실행" />
-          <NavCard href="/api/health" icon={<Activity className="w-5 h-5" />} label="시스템 상태" />
         </div>
       </div>
     </main>
