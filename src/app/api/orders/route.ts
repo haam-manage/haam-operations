@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { calculatePrice, extractCabinetSize } from '../../../../lib/price';
 import { validatePhone, validateCabinetNumber, validateSecurityCode, generateSecurityCode, calculateExpiryDate } from '../../../../lib/validation';
 import { generateOrderId } from '../../../../lib/toss';
+import { isPromotionActive } from '../../../../lib/promotions';
 
 /**
  * POST /api/orders — 주문(예약) 생성
@@ -41,13 +42,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '이미 사용 중인 보관함입니다' }, { status: 409 });
   }
 
-  // 가격 계산
+  // 가격 계산 — 활성 프로모션은 DB 플래그로 관리 (/promotions)
   const cabinetSize = extractCabinetSize(cabinetNumber);
-  // TODO: DB에서 활성 프로모션 조회
+  const promotionActive = await isPromotionActive();
   const priceResult = calculatePrice({
     cabinetSize,
     months: Number(months),
-    promotionActive: true, // 현재 프로모션 활성 상태
+    promotionActive,
   });
 
   // 보안코드 생성

@@ -126,7 +126,7 @@ export default async function AdminDashboard() {
         {/* Nav */}
         <div className="grid grid-cols-2 gap-3">
           <NavCard href="/contracts" icon={<Users className="w-5 h-5" />} label="계약 관리" />
-          <NavCard href="/promotions" icon={<Gift className="w-5 h-5" />} label="프로모션" disabled />
+          <NavCard href="/promotions" icon={<Gift className="w-5 h-5" />} label="프로모션" />
         </div>
       </div>
     </main>

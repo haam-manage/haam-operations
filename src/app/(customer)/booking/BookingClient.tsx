@@ -28,6 +28,7 @@ interface BookingClientProps {
   name: string;
   phone: string;
   email: string | null;
+  promotionActive: boolean;
 }
 
 const SIZE_INFO: Record<string, { name: string; price: number; deposit: number; maxUsers: number; image: string; dimension: string; desc: string }> = {
@@ -36,14 +37,10 @@ const SIZE_INFO: Record<string, { name: string; price: number; deposit: number; 
   XL: { name: '넉넉:함', price: 200_000, deposit: 200_000, maxUsers: 4, image: '/images/5.png', dimension: '200 × 100 × 220cm', desc: '대형 스포츠 장비, 이불, 가전제품' },
 };
 
-// 서버 api/orders/route.ts 의 promotionActive 플래그와 일치시킬 것.
-// 둘 다 DB 활성 프로모션 조회로 교체되어야 하며, 현 시점에는 둘 다 true 하드코드.
-const PROMOTION_ACTIVE = true;
-
 const MIN_MONTHS = 1;
 const MAX_MONTHS = 12;
 
-export function BookingClient({ customerId, name, phone, email: initialEmail }: BookingClientProps) {
+export function BookingClient({ customerId, name, phone, email: initialEmail, promotionActive }: BookingClientProps) {
   const [step, setStep] = useState<Step>(1);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [selectedSize, setSelectedSize] = useState<CabinetSize | null>(null);
@@ -123,7 +120,7 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
   };
 
   const estimate: PriceResult | null = selectedSize
-    ? calculatePrice({ cabinetSize: selectedSize, months, promotionActive: PROMOTION_ACTIVE })
+    ? calculatePrice({ cabinetSize: selectedSize, months, promotionActive })
     : null;
   const endDate = calculateEndDate(startDate, months);
 
