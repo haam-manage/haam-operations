@@ -131,6 +131,13 @@ export default function SplashPage() {
               오시는 길
             </a>
           </div>
+
+          <Link
+            href="/my"
+            className="block text-center text-xs text-stone-400 hover:text-amber-500 transition-colors py-2"
+          >
+            이미 이용 중이신가요? 내 예약 조회 →
+          </Link>
         </div>
       </motion.div>
     </main>
