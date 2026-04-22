@@ -3,6 +3,9 @@
  *
  * 비즈니스 규칙 원본: docs/business-rules.md §1~§2
  * GAS 원본: legacy-gas/AlimtalkService.gs calculatePricing_(), calculatePromoPricing_()
+ *
+ * DB 프로모션 연동: `findApplicablePromotion()`가 반환한 룰을 promotion 으로 전달.
+ * promotion === null 이면 장기할인(DISCOUNT_TIERS) 기본 적용.
  */
 
 // ─────────────────────────────────────────
@@ -10,23 +13,31 @@
 // ─────────────────────────────────────────
 
 export type CabinetSize = 'M' | 'L' | 'XL';
+export type PromotionType = 'discount_rate' | 'free_months' | 'fixed_discount';
+
+export interface PromotionRule {
+  type: PromotionType;
+  discountRate?: string | number | null; // numeric (0~1). DB numeric → string
+  freeMonths?: number | null;
+  discountAmount?: number | null;        // 원 단위 총액 할인
+}
 
 export interface PriceInput {
   cabinetSize: CabinetSize;
-  months: number;         // 계약 개월수 (1~12)
-  promotionActive: boolean;
+  months: number;
+  promotion: PromotionRule | null;
 }
 
 export interface PriceResult {
   cabinetSize: CabinetSize;
-  basePrice: number;        // 월 정가
-  deposit: number;          // 보증금
-  discountRate: number;     // 적용 할인율 (0~1)
-  monthlyPrice: number;     // 할인 적용 월 단가
-  billableMonths: number;   // 실결제 개월수
-  freeMonths: number;       // 무료 개월수
-  totalRental: number;      // 총 렌탈료
-  totalAmount: number;      // 총 결제금액 (렌탈 + 보증금)
+  basePrice: number;
+  deposit: number;
+  discountRate: number;
+  monthlyPrice: number;
+  billableMonths: number;
+  freeMonths: number;
+  totalRental: number;
+  totalAmount: number;
 }
 
 // ─────────────────────────────────────────
@@ -46,28 +57,21 @@ const DISCOUNT_TIERS: { minMonths: number; rate: number }[] = [
   { minMonths:  1, rate: 0.00 },
 ];
 
-const PROMOTION_PRICING: Record<number, { payMonths: number; freeMonths: number; discountRate: number }> = {
-  1:  { payMonths: 1, freeMonths: 0, discountRate: 0.15 },
-  3:  { payMonths: 2, freeMonths: 1, discountRate: 0    },
-  6:  { payMonths: 4, freeMonths: 2, discountRate: 0    },
-  12: { payMonths: 8, freeMonths: 4, discountRate: 0    },
-};
-
 // ─────────────────────────────────────────
-// 가격 계산 함수
+// 가격 계산
 // ─────────────────────────────────────────
 
 export function calculatePrice(input: PriceInput): PriceResult {
-  const { cabinetSize, months, promotionActive } = input;
+  const { cabinetSize, months, promotion } = input;
   const priceInfo = PRICING[cabinetSize];
 
-  if (promotionActive) {
-    return calculatePromoPrice(cabinetSize, months, priceInfo);
+  if (!promotion) {
+    return calculateTieredPrice(cabinetSize, months, priceInfo);
   }
-  return calculateNormalPrice(cabinetSize, months, priceInfo);
+  return calculatePromoPrice(cabinetSize, months, priceInfo, promotion);
 }
 
-function calculateNormalPrice(
+function calculateTieredPrice(
   cabinetSize: CabinetSize,
   months: number,
   priceInfo: { basePrice: number; deposit: number },
@@ -94,28 +98,66 @@ function calculatePromoPrice(
   cabinetSize: CabinetSize,
   months: number,
   priceInfo: { basePrice: number; deposit: number },
+  promo: PromotionRule,
 ): PriceResult {
-  const promo = PROMOTION_PRICING[months];
-
-  // 프로모션 테이블에 없는 개월수 → 일반 할인 적용
-  if (!promo) {
-    return calculateNormalPrice(cabinetSize, months, priceInfo);
+  if (promo.type === 'discount_rate') {
+    const rate = Math.min(Math.max(toNumber(promo.discountRate) ?? 0, 0), 1);
+    const monthlyPrice = Math.round(priceInfo.basePrice * (1 - rate));
+    const totalRental = monthlyPrice * months;
+    return {
+      cabinetSize,
+      basePrice: priceInfo.basePrice,
+      deposit: priceInfo.deposit,
+      discountRate: rate,
+      monthlyPrice,
+      billableMonths: months,
+      freeMonths: 0,
+      totalRental,
+      totalAmount: totalRental + priceInfo.deposit,
+    };
   }
 
-  const monthlyPrice = Math.round(priceInfo.basePrice * (1 - promo.discountRate));
-  const totalRental = monthlyPrice * promo.payMonths;
+  if (promo.type === 'free_months') {
+    const free = Math.min(Math.max(promo.freeMonths ?? 0, 0), months - 1); // 최소 1개월은 결제
+    const billable = months - free;
+    const monthlyPrice = priceInfo.basePrice;
+    const totalRental = monthlyPrice * billable;
+    return {
+      cabinetSize,
+      basePrice: priceInfo.basePrice,
+      deposit: priceInfo.deposit,
+      discountRate: 0,
+      monthlyPrice,
+      billableMonths: billable,
+      freeMonths: free,
+      totalRental,
+      totalAmount: totalRental + priceInfo.deposit,
+    };
+  }
 
+  // fixed_discount: 총 렌탈료에서 정액 차감
+  const amount = Math.max(promo.discountAmount ?? 0, 0);
+  const baseRental = priceInfo.basePrice * months;
+  const totalRental = Math.max(baseRental - amount, 0);
+  const monthlyPrice = Math.round(totalRental / months);
   return {
     cabinetSize,
     basePrice: priceInfo.basePrice,
     deposit: priceInfo.deposit,
-    discountRate: promo.discountRate,
+    discountRate: baseRental > 0 ? (baseRental - totalRental) / baseRental : 0,
     monthlyPrice,
-    billableMonths: promo.payMonths,
-    freeMonths: promo.freeMonths,
+    billableMonths: months,
+    freeMonths: 0,
     totalRental,
     totalAmount: totalRental + priceInfo.deposit,
   };
+}
+
+function toNumber(v: string | number | null | undefined): number | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return v;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 // ─────────────────────────────────────────

@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { calculatePrice, extractCabinetSize } from '../../../../lib/price';
 import { validatePhone, validateCabinetNumber, validateSecurityCode, generateSecurityCode, calculateExpiryDate } from '../../../../lib/validation';
 import { generateOrderId } from '../../../../lib/toss';
-import { isPromotionActive } from '../../../../lib/promotions';
+import { findApplicablePromotion, toPromotionRule } from '../../../../lib/promotions';
 
 /**
  * POST /api/orders — 주문(예약) 생성
@@ -42,13 +42,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '이미 사용 중인 보관함입니다' }, { status: 409 });
   }
 
-  // 가격 계산 — 활성 프로모션은 DB 플래그로 관리 (/promotions)
+  // 가격 계산 — 적용 가능한 활성 프로모션 룰 조회 (사이즈·개월·기간 필터)
   const cabinetSize = extractCabinetSize(cabinetNumber);
-  const promotionActive = await isPromotionActive();
+  const promoRow = await findApplicablePromotion(cabinetSize, Number(months));
   const priceResult = calculatePrice({
     cabinetSize,
     months: Number(months),
-    promotionActive,
+    promotion: toPromotionRule(promoRow),
   });
 
   // 보안코드 생성

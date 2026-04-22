@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../../../db';
-import { promotions } from '../../../../../../db/schema';
+import { promotions, promotionTypeEnum, cabinetSizeEnum } from '../../../../../../db/schema';
 import { eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
+type PromotionType = (typeof promotionTypeEnum.enumValues)[number];
+type CabinetSize = (typeof cabinetSizeEnum.enumValues)[number];
+
 /**
  * PATCH /api/admin/promotions/:id
- * body: { isActive: boolean }
- * 프로모션 활성/비활성 토글. 단순 플래그 변경만 지원.
+ *
+ * body 에 포함된 필드만 부분 업데이트. 단순 토글(isActive)·전체 수정 둘 다 지원.
  */
 export async function PATCH(
   req: NextRequest,
@@ -16,11 +19,6 @@ export async function PATCH(
 ) {
   const { id } = await ctx.params;
   const body = await req.json().catch(() => ({}));
-  const { isActive } = body as { isActive?: boolean };
-
-  if (typeof isActive !== 'boolean') {
-    return NextResponse.json({ error: 'isActive(boolean) 필수' }, { status: 400 });
-  }
 
   const existing = await db.query.promotions.findFirst({
     where: eq(promotions.id, id),
@@ -29,10 +27,104 @@ export async function PATCH(
     return NextResponse.json({ error: '프로모션을 찾을 수 없습니다' }, { status: 404 });
   }
 
-  await db
-    .update(promotions)
-    .set({ isActive, updatedAt: new Date() })
-    .where(eq(promotions.id, id));
+  const patch: Partial<typeof promotions.$inferInsert> = { updatedAt: new Date() };
+  const errors: string[] = [];
 
-  return NextResponse.json({ success: true, isActive });
+  if (typeof body.name === 'string') {
+    const n = body.name.trim();
+    if (!n || n.length > 100) errors.push('name 1~100자');
+    else patch.name = n;
+  }
+  if (typeof body.isActive === 'boolean') patch.isActive = body.isActive;
+  if (typeof body.isNewOnly === 'boolean') patch.isNewOnly = body.isNewOnly;
+  if (Number.isFinite(Number(body.priority))) patch.priority = Number(body.priority);
+
+  if (body.type !== undefined) {
+    if (['discount_rate', 'free_months', 'fixed_discount'].includes(body.type)) {
+      patch.type = body.type as PromotionType;
+    } else errors.push('type 값 오류');
+  }
+
+  if (body.applicableSizes !== undefined) {
+    if (body.applicableSizes === null) patch.applicableSizes = null;
+    else if (Array.isArray(body.applicableSizes)) {
+      const sizes = body.applicableSizes.filter((s: unknown) => s === 'M' || s === 'L' || s === 'XL') as CabinetSize[];
+      patch.applicableSizes = sizes.length > 0 ? sizes : null;
+    } else errors.push('applicableSizes 는 배열 또는 null');
+  }
+
+  if (body.applicableMonths !== undefined) {
+    if (body.applicableMonths === null) patch.applicableMonths = null;
+    else if (Array.isArray(body.applicableMonths)) {
+      const months = body.applicableMonths.map(Number).filter((n: number) => Number.isInteger(n) && n >= 1 && n <= 12);
+      patch.applicableMonths = months.length > 0 ? months : null;
+    } else errors.push('applicableMonths 는 배열 또는 null');
+  }
+
+  if (body.discountRate !== undefined) {
+    if (body.discountRate === null || body.discountRate === '') patch.discountRate = null;
+    else {
+      const r = Number(body.discountRate);
+      if (!Number.isFinite(r) || r <= 0 || r >= 1) errors.push('discountRate 0~1');
+      else patch.discountRate = r.toFixed(4);
+    }
+  }
+
+  if (body.freeMonths !== undefined) {
+    if (body.freeMonths === null || body.freeMonths === '') patch.freeMonths = null;
+    else {
+      const f = Number(body.freeMonths);
+      if (!Number.isInteger(f) || f < 1) errors.push('freeMonths 1 이상');
+      else patch.freeMonths = f;
+    }
+  }
+
+  if (body.discountAmount !== undefined) {
+    if (body.discountAmount === null || body.discountAmount === '') patch.discountAmount = null;
+    else {
+      const a = Number(body.discountAmount);
+      if (!Number.isInteger(a) || a < 0) errors.push('discountAmount 0 이상 정수');
+      else patch.discountAmount = a;
+    }
+  }
+
+  if (body.startsAt !== undefined) {
+    if (body.startsAt === null || body.startsAt === '') patch.startsAt = null;
+    else {
+      const d = new Date(body.startsAt);
+      if (isNaN(d.getTime())) errors.push('startsAt 형식 오류');
+      else patch.startsAt = d;
+    }
+  }
+
+  if (body.endsAt !== undefined) {
+    if (body.endsAt === null || body.endsAt === '') patch.endsAt = null;
+    else {
+      const d = new Date(body.endsAt);
+      if (isNaN(d.getTime())) errors.push('endsAt 형식 오류');
+      else patch.endsAt = d;
+    }
+  }
+
+  if (errors.length > 0) {
+    return NextResponse.json({ error: errors.join(', ') }, { status: 400 });
+  }
+
+  await db.update(promotions).set(patch).where(eq(promotions.id, id));
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const { id } = await ctx.params;
+  const existing = await db.query.promotions.findFirst({
+    where: eq(promotions.id, id),
+  });
+  if (!existing) {
+    return NextResponse.json({ error: '프로모션을 찾을 수 없습니다' }, { status: 404 });
+  }
+  await db.delete(promotions).where(eq(promotions.id, id));
+  return NextResponse.json({ success: true });
 }

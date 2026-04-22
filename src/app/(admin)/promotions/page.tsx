@@ -1,9 +1,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Gift, CheckCircle, XCircle, Sparkles } from 'lucide-react';
-import { ensureOpeningPromotion, OPENING_PROMO_NAME } from '../../../../lib/promotions';
+import { ArrowLeft, Gift } from 'lucide-react';
+import {
+  ensureOpeningPromotionSeeds,
+  findApplicablePromotion,
+  listPromotions,
+  toPromotionRule,
+} from '../../../../lib/promotions';
 import { calculatePrice, type CabinetSize } from '../../../../lib/price';
-import { ToggleButton } from './ToggleButton';
+import { PromotionsBoard } from './PromotionsBoard';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +17,36 @@ const MONTHS = [1, 3, 6, 12];
 const SIZE_LABEL: Record<CabinetSize, string> = { M: '소중:함', L: '든든:함', XL: '넉넉:함' };
 
 export default async function PromotionsPage() {
-  const promo = await ensureOpeningPromotion();
-  const active = promo.isActive;
+  await ensureOpeningPromotionSeeds();
+  const rows = await listPromotions();
+
+  // 프리뷰: 각 (size, month) 조합에 대해 실제 적용될 가격 계산
+  const preview = await Promise.all(
+    SIZES.flatMap(size =>
+      MONTHS.map(async months => {
+        const promo = await findApplicablePromotion(size, months);
+        const r = calculatePrice({ cabinetSize: size, months, promotion: toPromotionRule(promo) });
+        return { size, months, r, promoName: promo?.name ?? null };
+      }),
+    ),
+  );
+  const previewMap = new Map(preview.map(p => [`${p.size}-${p.months}`, p]));
+
+  const boardRows = rows.map(r => ({
+    id: r.id,
+    name: r.name,
+    type: r.type,
+    isActive: r.isActive,
+    priority: r.priority,
+    isNewOnly: r.isNewOnly,
+    applicableSizes: (r.applicableSizes as string[] | null) ?? null,
+    applicableMonths: (r.applicableMonths as number[] | null) ?? null,
+    discountRate: r.discountRate,
+    freeMonths: r.freeMonths,
+    discountAmount: r.discountAmount,
+    startsAt: r.startsAt ? r.startsAt.toISOString() : null,
+    endsAt: r.endsAt ? r.endsAt.toISOString() : null,
+  }));
 
   return (
     <main className="min-h-screen">
@@ -26,54 +59,21 @@ export default async function PromotionsPage() {
             <Image src="/images/HAAM_LOGO(S)_001.jpg" alt="HAAM" width={24} height={24} className="rounded-md" />
             <span className="text-sm font-semibold text-white flex items-center gap-1.5">
               <Gift className="w-4 h-4 text-amber-600" />
-              프로모션
+              프로모션 관리
             </span>
           </div>
         </div>
       </header>
 
-      <div className="max-w-3xl mx-auto px-5 py-6">
-        {/* Status card */}
-        <section className={`${active ? 'glass-warm glow-warm' : 'glass'} p-5 mb-4`}>
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <Sparkles className={`w-4 h-4 ${active ? 'text-amber-400' : 'text-stone-500'}`} />
-                <h2 className="text-sm font-semibold text-white">{OPENING_PROMO_NAME}</h2>
-              </div>
-              <div className="flex items-center gap-1.5">
-                {active ? (
-                  <>
-                    <CheckCircle className="w-3.5 h-3.5 text-green-400" />
-                    <span className="text-xs text-green-300">활성 — 신규 예약에 적용 중</span>
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="w-3.5 h-3.5 text-stone-500" />
-                    <span className="text-xs text-stone-500">비활성 — 장기할인(10/15/20%) 기본 적용</span>
-                  </>
-                )}
-              </div>
-            </div>
-            <ToggleButton promotionId={promo.id} isActive={active} />
-          </div>
+      <div className="max-w-3xl mx-auto px-5 py-6 space-y-5">
+        <PromotionsBoard rows={boardRows} />
 
-          <div className="text-[11px] text-stone-500 leading-relaxed border-t border-white/5 pt-4">
-            활성 시: <span className="text-stone-300">1→1개월(15% 할인)</span>
-            <span className="mx-1.5 text-stone-700">·</span>
-            <span className="text-stone-300">3→2개월 결제 + 1개월 무료</span>
-            <span className="mx-1.5 text-stone-700">·</span>
-            <span className="text-stone-300">6→4+2</span>
-            <span className="mx-1.5 text-stone-700">·</span>
-            <span className="text-stone-300">12→8+4</span>
-          </div>
-        </section>
-
-        {/* Pricing preview */}
-        <section className="glass p-5 mb-4">
-          <h3 className="text-xs text-stone-500 uppercase tracking-widest mb-4">
-            {active ? '현재 적용 단가' : '비활성 시 단가(장기할인)'}
-          </h3>
+        {/* Pricing preview — 실제 적용 결과 */}
+        <section className="glass p-5">
+          <h3 className="text-xs text-stone-500 uppercase tracking-widest mb-1">현재 적용 단가 (실시간)</h3>
+          <p className="text-[10px] text-stone-600 mb-4">
+            각 셀은 해당 사이즈·개월에 "적용 가능한 활성 프로모션" 을 자동 탐색한 결과입니다. 프로모션이 없으면 장기할인 기본 적용.
+          </p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -91,17 +91,24 @@ export default async function PromotionsPage() {
                   <tr key={m}>
                     <td className="py-2.5 pr-2 text-stone-400">{m}개월</td>
                     {SIZES.map(size => {
-                      const r = calculatePrice({ cabinetSize: size, months: m, promotionActive: active });
+                      const cell = previewMap.get(`${size}-${m}`);
+                      if (!cell) return <td key={size}>-</td>;
+                      const { r, promoName } = cell;
                       return (
                         <td key={size} className="text-right py-2.5 px-2">
                           <div className="text-white font-medium">₩{r.totalRental.toLocaleString()}</div>
                           <div className="text-[10px] text-stone-600">
                             {r.freeMonths > 0 ? (
                               <>{r.billableMonths}달 결제 · {r.freeMonths}달 무료</>
+                            ) : r.discountRate > 0 ? (
+                              <>월 ₩{r.monthlyPrice.toLocaleString()} · {Math.round(r.discountRate * 100)}% 할인</>
                             ) : (
-                              <>월 ₩{r.monthlyPrice.toLocaleString()}{r.discountRate > 0 && ` · ${Math.round(r.discountRate * 100)}% 할인`}</>
+                              <>월 ₩{r.monthlyPrice.toLocaleString()}</>
                             )}
                           </div>
+                          {promoName && (
+                            <div className="text-[9px] text-amber-500/80 truncate" title={promoName}>★ {promoName.replace(/^오픈기념\s*/, '')}</div>
+                          )}
                         </td>
                       );
                     })}
@@ -110,12 +117,8 @@ export default async function PromotionsPage() {
               </tbody>
             </table>
           </div>
-          <p className="text-[10px] text-stone-600 mt-4">* 보증금은 별도 — 렌탈료 합계만 표시</p>
+          <p className="text-[10px] text-stone-600 mt-4">* 보증금 별도 · ★ = 프로모션 적용 중</p>
         </section>
-
-        <p className="text-[11px] text-stone-600 text-center">
-          현재는 "오픈기념 프로모션" 단일 토글만 지원합니다. 추가 프로모션 타입은 필요 시 확장.
-        </p>
       </div>
     </main>
   );

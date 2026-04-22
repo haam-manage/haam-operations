@@ -8,9 +8,37 @@ import type { TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
 import { StepLayout } from '../../../components/StepLayout';
 import { Button } from '../../../components/Button';
 import { Input } from '../../../components/Input';
-import { calculatePrice, type CabinetSize, type PriceResult } from '../../../../lib/price';
+import { calculatePrice, type CabinetSize, type PriceResult, type PromotionRule, type PromotionType } from '../../../../lib/price';
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
+
+interface ActivePromotion {
+  id: string;
+  name: string;
+  type: PromotionType;
+  priority: number;
+  applicableSizes: CabinetSize[] | null;
+  applicableMonths: number[] | null;
+  discountRate: string | null;
+  freeMonths: number | null;
+  discountAmount: number | null;
+}
+
+function findRuleFor(size: CabinetSize, months: number, promos: ActivePromotion[]): PromotionRule | null {
+  for (const p of promos) {
+    const sizeOk = !p.applicableSizes || p.applicableSizes.includes(size);
+    const monthsOk = !p.applicableMonths || p.applicableMonths.includes(months);
+    if (sizeOk && monthsOk) {
+      return {
+        type: p.type,
+        discountRate: p.discountRate,
+        freeMonths: p.freeMonths,
+        discountAmount: p.discountAmount,
+      };
+    }
+  }
+  return null;
+}
 
 interface PriceBreakdown {
   basePrice: number;
@@ -28,7 +56,6 @@ interface BookingClientProps {
   name: string;
   phone: string;
   email: string | null;
-  promotionActive: boolean;
 }
 
 const SIZE_INFO: Record<string, { name: string; price: number; deposit: number; maxUsers: number; image: string; dimension: string; desc: string }> = {
@@ -40,7 +67,7 @@ const SIZE_INFO: Record<string, { name: string; price: number; deposit: number; 
 const MIN_MONTHS = 1;
 const MAX_MONTHS = 12;
 
-export function BookingClient({ customerId, name, phone, email: initialEmail, promotionActive }: BookingClientProps) {
+export function BookingClient({ customerId, name, phone, email: initialEmail }: BookingClientProps) {
   const [step, setStep] = useState<Step>(1);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [selectedSize, setSelectedSize] = useState<CabinetSize | null>(null);
@@ -54,6 +81,7 @@ export function BookingClient({ customerId, name, phone, email: initialEmail, pr
   const [widgetsReady, setWidgetsReady] = useState(false);
   const [orderResult, setOrderResult] = useState<{ orderId: string; orderName: string } | null>(null);
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
+  const [activePromos, setActivePromos] = useState<ActivePromotion[]>([]);
   const widgetsRef = useRef<TossPaymentsWidgets | null>(null);
 
   useEffect(() => {
@@ -66,6 +94,16 @@ export function BookingClient({ customerId, name, phone, email: initialEmail, pr
           map[c.number] = c.isAvailable;
         }
         setAvailability(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/promotions/active')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.promotions) return;
+        setActivePromos(data.promotions as ActivePromotion[]);
       })
       .catch(() => {});
   }, []);
@@ -120,7 +158,7 @@ export function BookingClient({ customerId, name, phone, email: initialEmail, pr
   };
 
   const estimate: PriceResult | null = selectedSize
-    ? calculatePrice({ cabinetSize: selectedSize, months, promotionActive })
+    ? calculatePrice({ cabinetSize: selectedSize, months, promotion: findRuleFor(selectedSize, months, activePromos) })
     : null;
   const endDate = calculateEndDate(startDate, months);
 

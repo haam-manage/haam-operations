@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePrice, extractCabinetSize } from '../../lib/price';
+import { calculatePrice, extractCabinetSize, type PromotionRule } from '../../lib/price';
 
-describe('calculatePrice — 일반 할인 (프로모션 OFF)', () => {
-  // M 사이즈 테스트
+// 프로모션 없음 = null 전달 → DISCOUNT_TIERS 기본 적용
+describe('calculatePrice — 일반 할인 (프로모션 없음)', () => {
   it('M / 1개월 / 할인 없음', () => {
-    const r = calculatePrice({ cabinetSize: 'M', months: 1, promotionActive: false });
+    const r = calculatePrice({ cabinetSize: 'M', months: 1, promotion: null });
     expect(r.discountRate).toBe(0);
     expect(r.monthlyPrice).toBe(70_000);
     expect(r.totalRental).toBe(70_000);
-    expect(r.totalAmount).toBe(140_000); // 70000 + 70000 보증금
+    expect(r.totalAmount).toBe(140_000);
   });
 
   it('M / 3개월 / 10% 할인', () => {
-    const r = calculatePrice({ cabinetSize: 'M', months: 3, promotionActive: false });
+    const r = calculatePrice({ cabinetSize: 'M', months: 3, promotion: null });
     expect(r.discountRate).toBe(0.10);
     expect(r.monthlyPrice).toBe(63_000);
     expect(r.totalRental).toBe(189_000);
@@ -20,7 +20,7 @@ describe('calculatePrice — 일반 할인 (프로모션 OFF)', () => {
   });
 
   it('M / 6개월 / 15% 할인', () => {
-    const r = calculatePrice({ cabinetSize: 'M', months: 6, promotionActive: false });
+    const r = calculatePrice({ cabinetSize: 'M', months: 6, promotion: null });
     expect(r.discountRate).toBe(0.15);
     expect(r.monthlyPrice).toBe(59_500);
     expect(r.totalRental).toBe(357_000);
@@ -28,25 +28,23 @@ describe('calculatePrice — 일반 할인 (프로모션 OFF)', () => {
   });
 
   it('M / 12개월 / 20% 할인', () => {
-    const r = calculatePrice({ cabinetSize: 'M', months: 12, promotionActive: false });
+    const r = calculatePrice({ cabinetSize: 'M', months: 12, promotion: null });
     expect(r.discountRate).toBe(0.20);
     expect(r.monthlyPrice).toBe(56_000);
     expect(r.totalRental).toBe(672_000);
     expect(r.totalAmount).toBe(742_000);
   });
 
-  // L 사이즈 테스트
   it('L / 6개월 / 15% 할인', () => {
-    const r = calculatePrice({ cabinetSize: 'L', months: 6, promotionActive: false });
+    const r = calculatePrice({ cabinetSize: 'L', months: 6, promotion: null });
     expect(r.discountRate).toBe(0.15);
     expect(r.monthlyPrice).toBe(102_000);
     expect(r.totalRental).toBe(612_000);
     expect(r.totalAmount).toBe(732_000);
   });
 
-  // XL 사이즈 테스트
   it('XL / 12개월 / 20% 할인', () => {
-    const r = calculatePrice({ cabinetSize: 'XL', months: 12, promotionActive: false });
+    const r = calculatePrice({ cabinetSize: 'XL', months: 12, promotion: null });
     expect(r.discountRate).toBe(0.20);
     expect(r.monthlyPrice).toBe(160_000);
     expect(r.totalRental).toBe(1_920_000);
@@ -54,16 +52,19 @@ describe('calculatePrice — 일반 할인 (프로모션 OFF)', () => {
   });
 
   it('M / 2개월 / 할인 없음', () => {
-    const r = calculatePrice({ cabinetSize: 'M', months: 2, promotionActive: false });
+    const r = calculatePrice({ cabinetSize: 'M', months: 2, promotion: null });
     expect(r.discountRate).toBe(0);
     expect(r.totalRental).toBe(140_000);
     expect(r.totalAmount).toBe(210_000);
   });
 });
 
-describe('calculatePrice — 프로모션 (프로모션 ON)', () => {
-  it('M / 1개월 / 15% 할인', () => {
-    const r = calculatePrice({ cabinetSize: 'M', months: 1, promotionActive: true });
+// 오픈기념 프로모션 — DB 룰로 표현
+describe('calculatePrice — discount_rate 룰', () => {
+  const rule15: PromotionRule = { type: 'discount_rate', discountRate: '0.15' };
+
+  it('M / 1개월 / 15% 할인 룰', () => {
+    const r = calculatePrice({ cabinetSize: 'M', months: 1, promotion: rule15 });
     expect(r.discountRate).toBe(0.15);
     expect(r.monthlyPrice).toBe(59_500);
     expect(r.billableMonths).toBe(1);
@@ -71,9 +72,12 @@ describe('calculatePrice — 프로모션 (프로모션 ON)', () => {
     expect(r.totalRental).toBe(59_500);
     expect(r.totalAmount).toBe(129_500);
   });
+});
 
-  it('M / 3개월 / 2개월 결제 + 1개월 무료', () => {
-    const r = calculatePrice({ cabinetSize: 'M', months: 3, promotionActive: true });
+describe('calculatePrice — free_months 룰', () => {
+  it('M / 3개월 / 1달 무료', () => {
+    const rule: PromotionRule = { type: 'free_months', freeMonths: 1 };
+    const r = calculatePrice({ cabinetSize: 'M', months: 3, promotion: rule });
     expect(r.discountRate).toBe(0);
     expect(r.monthlyPrice).toBe(70_000);
     expect(r.billableMonths).toBe(2);
@@ -82,36 +86,53 @@ describe('calculatePrice — 프로모션 (프로모션 ON)', () => {
     expect(r.totalAmount).toBe(210_000);
   });
 
-  it('M / 6개월 / 4개월 결제 + 2개월 무료', () => {
-    const r = calculatePrice({ cabinetSize: 'M', months: 6, promotionActive: true });
+  it('M / 6개월 / 2달 무료', () => {
+    const rule: PromotionRule = { type: 'free_months', freeMonths: 2 };
+    const r = calculatePrice({ cabinetSize: 'M', months: 6, promotion: rule });
     expect(r.billableMonths).toBe(4);
     expect(r.freeMonths).toBe(2);
     expect(r.totalRental).toBe(280_000);
     expect(r.totalAmount).toBe(350_000);
   });
 
-  it('M / 12개월 / 8개월 결제 + 4개월 무료', () => {
-    const r = calculatePrice({ cabinetSize: 'M', months: 12, promotionActive: true });
+  it('M / 12개월 / 4달 무료', () => {
+    const rule: PromotionRule = { type: 'free_months', freeMonths: 4 };
+    const r = calculatePrice({ cabinetSize: 'M', months: 12, promotion: rule });
     expect(r.billableMonths).toBe(8);
     expect(r.freeMonths).toBe(4);
     expect(r.totalRental).toBe(560_000);
     expect(r.totalAmount).toBe(630_000);
   });
 
-  it('L / 3개월 / 프로모션 적용', () => {
-    const r = calculatePrice({ cabinetSize: 'L', months: 3, promotionActive: true });
+  it('L / 3개월 / 1달 무료', () => {
+    const rule: PromotionRule = { type: 'free_months', freeMonths: 1 };
+    const r = calculatePrice({ cabinetSize: 'L', months: 3, promotion: rule });
     expect(r.billableMonths).toBe(2);
     expect(r.totalRental).toBe(240_000);
     expect(r.totalAmount).toBe(360_000);
   });
 
-  it('M / 5개월 / 프로모션 테이블에 없음 → 일반 할인 폴백', () => {
-    const r = calculatePrice({ cabinetSize: 'M', months: 5, promotionActive: true });
-    // 5개월은 프로모션 테이블에 없으므로 일반 10% 할인 적용
-    expect(r.discountRate).toBe(0.10);
-    expect(r.billableMonths).toBe(5);
-    expect(r.freeMonths).toBe(0);
-    expect(r.totalRental).toBe(315_000);
+  it('freeMonths 가 months 이상이면 최소 1달은 결제', () => {
+    const rule: PromotionRule = { type: 'free_months', freeMonths: 99 };
+    const r = calculatePrice({ cabinetSize: 'M', months: 3, promotion: rule });
+    expect(r.billableMonths).toBe(1);
+    expect(r.freeMonths).toBe(2);
+  });
+});
+
+describe('calculatePrice — fixed_discount 룰', () => {
+  it('M / 3개월 / ₩30,000 정액 할인', () => {
+    const rule: PromotionRule = { type: 'fixed_discount', discountAmount: 30_000 };
+    const r = calculatePrice({ cabinetSize: 'M', months: 3, promotion: rule });
+    expect(r.totalRental).toBe(180_000); // 70k * 3 - 30k
+    expect(r.totalAmount).toBe(250_000);
+  });
+
+  it('할인액이 총 렌탈료 초과 시 총액은 0 이상', () => {
+    const rule: PromotionRule = { type: 'fixed_discount', discountAmount: 999_999_999 };
+    const r = calculatePrice({ cabinetSize: 'M', months: 1, promotion: rule });
+    expect(r.totalRental).toBe(0);
+    expect(r.totalAmount).toBe(70_000); // 보증금만
   });
 });
 
