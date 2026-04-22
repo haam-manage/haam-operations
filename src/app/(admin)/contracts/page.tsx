@@ -4,6 +4,7 @@ import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Search, Download, Users, CheckCircle, Clock, AlertTriangle, Archive, Layers } from 'lucide-react';
+import { CancelButton } from './CancelButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -197,6 +198,14 @@ export default async function ContractsPage({ searchParams }: PageProps) {
                   <div className="text-right flex-shrink-0">
                     <div className="text-sm text-white font-medium">₩{r.rentalAmount.toLocaleString()}</div>
                     <div className="text-[10px] text-stone-600">보증금 ₩{r.depositAmount.toLocaleString()}</div>
+                    {r.status === 'reserved' && (
+                      <div className="mt-1">
+                        <CancelButton
+                          contractId={r.id}
+                          label={`${r.customerName} · ${r.cabinetNumber} · ${r.months}개월`}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

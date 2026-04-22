@@ -4,8 +4,9 @@ import { eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { User, Box, Calendar, Users, RefreshCw, AlertTriangle, Shield, ChevronDown } from 'lucide-react';
+import { User, Box, Users, RefreshCw, AlertTriangle, Home } from 'lucide-react';
 import { CopyCodeCard } from './CopyCodeCard';
+import { BackButton } from './BackButton';
 
 interface PageProps {
   params: Promise<{ token: string }>;
@@ -40,9 +41,19 @@ export default async function MyPage({ params }: PageProps) {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-[#0c0a09]/90 backdrop-blur-lg border-b border-white/5 safe-top">
         <div className="max-w-lg mx-auto px-5 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Image src="/images/HAAM_LOGO(S)_001.jpg" alt="HAAM" width={24} height={24} className="rounded-md" />
-            <span className="text-sm font-medium text-white">마이페이지</span>
+          <div className="flex items-center gap-1">
+            <BackButton />
+            <Link
+              href="/"
+              aria-label="홈"
+              className="touch-target w-9 h-9 flex items-center justify-center text-stone-400 hover:text-stone-200 transition-colors"
+            >
+              <Home className="w-4 h-4" />
+            </Link>
+            <div className="flex items-center gap-2 ml-1">
+              <Image src="/images/HAAM_LOGO(S)_001.jpg" alt="HAAM" width={22} height={22} className="rounded-md" />
+              <span className="text-sm font-medium text-white">마이페이지</span>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {daysLeft !== null && daysLeft <= 30 && (
