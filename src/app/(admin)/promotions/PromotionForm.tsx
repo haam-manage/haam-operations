@@ -2,9 +2,14 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Save, X, Trash2 } from 'lucide-react';
+import { Loader2, Save, X, Trash2, Plus } from 'lucide-react';
 
-export type PromotionType = 'discount_rate' | 'free_months' | 'fixed_discount';
+export type PromotionType = 'discount_rate' | 'free_months' | 'fixed_discount' | 'per_month_schedule';
+
+export interface ScheduleEntry {
+  months: number[];
+  rate: number; // 0~1
+}
 
 export interface PromotionFormValues {
   id?: string;
@@ -18,6 +23,7 @@ export interface PromotionFormValues {
   discountRate: string | null; // "0.15"
   freeMonths: number | null;
   discountAmount: number | null;
+  monthlySchedule: ScheduleEntry[] | null;
   startsAt: string | null; // yyyy-mm-dd
   endsAt: string | null;
 }
@@ -33,6 +39,7 @@ const EMPTY: PromotionFormValues = {
   discountRate: '0.10',
   freeMonths: null,
   discountAmount: null,
+  monthlySchedule: null,
   startsAt: null,
   endsAt: null,
 };
@@ -64,6 +71,7 @@ export function PromotionForm({
       discountRate: v.type === 'discount_rate' ? Number(v.discountRate) : null,
       freeMonths: v.type === 'free_months' ? v.freeMonths : null,
       discountAmount: v.type === 'fixed_discount' ? v.discountAmount : null,
+      monthlySchedule: v.type === 'per_month_schedule' ? v.monthlySchedule : null,
       startsAt: v.startsAt || null,
       endsAt: v.endsAt || null,
     };
@@ -136,9 +144,10 @@ export function PromotionForm({
 
       <Field label="유형">
         <select value={v.type} onChange={e => setV({ ...v, type: e.target.value as PromotionType })} className="input-dark w-full px-3 py-2 text-sm">
-          <option value="discount_rate">할인율 (%)</option>
+          <option value="discount_rate">할인율 (%) — 계약 전체 동일 비율</option>
           <option value="free_months">무료 개월</option>
           <option value="fixed_discount">금액 할인 (원)</option>
+          <option value="per_month_schedule">월별 구간 할인 (1개월=50%, 2~3개월=20% …)</option>
         </select>
       </Field>
 
@@ -171,6 +180,15 @@ export function PromotionForm({
             value={v.discountAmount ?? ''}
             onChange={e => setV({ ...v, discountAmount: e.target.value ? Number(e.target.value) : null })}
             className="input-dark w-full px-3 py-2 text-sm"
+          />
+        </Field>
+      )}
+
+      {v.type === 'per_month_schedule' && (
+        <Field label="월별 구간 할인 (같은 월 중복 금지 · 미지정 월은 정가)">
+          <ScheduleEditor
+            entries={v.monthlySchedule ?? []}
+            onChange={next => setV({ ...v, monthlySchedule: next.length ? next : null })}
           />
         </Field>
       )}
@@ -296,6 +314,109 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="block text-[11px] text-stone-500 uppercase tracking-wider mb-1.5">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function ScheduleEditor({
+  entries,
+  onChange,
+}: {
+  entries: ScheduleEntry[];
+  onChange: (next: ScheduleEntry[]) => void;
+}) {
+  const usedMonths = new Set<number>();
+  entries.forEach((e, i) => e.months.forEach(m => usedMonths.add(m)));
+
+  const addRow = () => onChange([...entries, { months: [], rate: 0.1 }]);
+  const removeRow = (idx: number) => onChange(entries.filter((_, i) => i !== idx));
+  const updateRow = (idx: number, patch: Partial<ScheduleEntry>) =>
+    onChange(entries.map((e, i) => (i === idx ? { ...e, ...patch } : e)));
+
+  return (
+    <div className="space-y-2.5">
+      {entries.length === 0 && (
+        <p className="text-[10px] text-stone-600 italic">아직 구간이 없습니다. 아래 "구간 추가" 를 눌러 시작하세요.</p>
+      )}
+      {entries.map((entry, idx) => {
+        // 이 행에서 선택 가능한 월 = 전체 - (다른 행이 선점한 월)
+        const othersUsed = new Set<number>();
+        entries.forEach((e, i) => {
+          if (i !== idx) e.months.forEach(m => othersUsed.add(m));
+        });
+        return (
+          <div key={idx} className="bg-white/3 border border-white/5 rounded-xl p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-stone-500 uppercase tracking-wider">구간 {idx + 1}</span>
+              <button
+                type="button"
+                onClick={() => removeRow(idx)}
+                className="text-[10px] text-red-400 hover:text-red-300 inline-flex items-center gap-1"
+              >
+                <Trash2 className="w-3 h-3" />
+                제거
+              </button>
+            </div>
+
+            <div>
+              <div className="text-[10px] text-stone-600 mb-1">적용 월</div>
+              <div className="flex flex-wrap gap-1">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => {
+                  const selected = entry.months.includes(m);
+                  const disabled = !selected && othersUsed.has(m);
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => {
+                        const next = selected
+                          ? entry.months.filter(x => x !== m)
+                          : [...entry.months, m].sort((a, b) => a - b);
+                        updateRow(idx, { months: next });
+                      }}
+                      className={`px-2 py-0.5 rounded text-[11px] font-mono border transition-colors ${
+                        disabled
+                          ? 'bg-white/2 border-white/5 text-stone-700 cursor-not-allowed'
+                          : selected
+                          ? 'bg-amber-600/15 border-amber-600/30 text-amber-300'
+                          : 'bg-white/3 border-white/10 text-stone-400 hover:text-stone-200'
+                      }`}
+                      title={disabled ? '다른 구간에서 사용 중' : ''}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="text-[10px] text-stone-600 shrink-0">할인율</div>
+              <input
+                type="number" step="0.01" min="0.01" max="0.99"
+                value={entry.rate}
+                onChange={e => updateRow(idx, { rate: Number(e.target.value) || 0 })}
+                className="input-dark w-24 px-2 py-1 text-xs"
+              />
+              <span className="text-[10px] text-stone-500">= {Math.round((entry.rate || 0) * 100)}% 할인</span>
+            </div>
+          </div>
+        );
+      })}
+
+      <button
+        type="button"
+        onClick={addRow}
+        className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs text-stone-400 hover:text-amber-400 bg-white/2 border border-dashed border-white/10 hover:border-amber-600/30 transition-colors"
+      >
+        <Plus className="w-3.5 h-3.5" />
+        구간 추가
+      </button>
+
+      <p className="text-[10px] text-stone-600 leading-relaxed">
+        예: "1개월은 50%, 2~3개월은 20%" → 구간1(월=1, 할인=0.5) + 구간2(월=2,3, 할인=0.2)
+      </p>
     </div>
   );
 }

@@ -54,9 +54,10 @@ export const qrStatusEnum = pgEnum('qr_status', [
 ]);
 
 export const promotionTypeEnum = pgEnum('promotion_type', [
-  'discount_rate',    // 할인율 (%)
-  'free_months',      // 무료 개월
-  'fixed_discount',   // 금액 할인
+  'discount_rate',        // 할인율 (%) — 계약 전체 동일 비율
+  'free_months',          // 무료 개월
+  'fixed_discount',       // 금액 할인
+  'per_month_schedule',   // 월별 구간 할인율 (예: 1개월=50%, 2~3개월=20%)
 ]);
 
 // ─────────────────────────────────────────
@@ -250,6 +251,8 @@ export const promotions = pgTable('promotions', {
   discountRate: numeric('discount_rate', { precision: 5, scale: 4 }), // 0.15 = 15%
   freeMonths: integer('free_months'),
   discountAmount: integer('discount_amount'),
+  // per_month_schedule 전용 — [{ months: [1], rate: 0.5 }, { months: [2,3], rate: 0.2 }]
+  monthlySchedule: jsonb('monthly_schedule'),
   // 유효 기간
   startsAt: timestamp('starts_at', { withTimezone: true }),
   endsAt: timestamp('ends_at', { withTimezone: true }),

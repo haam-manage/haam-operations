@@ -13,13 +13,19 @@
 // ─────────────────────────────────────────
 
 export type CabinetSize = 'M' | 'L' | 'XL';
-export type PromotionType = 'discount_rate' | 'free_months' | 'fixed_discount';
+export type PromotionType = 'discount_rate' | 'free_months' | 'fixed_discount' | 'per_month_schedule';
+
+export interface MonthlyScheduleEntry {
+  months: number[]; // 1~12
+  rate: number;     // 0~1
+}
 
 export interface PromotionRule {
   type: PromotionType;
   discountRate?: string | number | null; // numeric (0~1). DB numeric → string
   freeMonths?: number | null;
   discountAmount?: number | null;        // 원 단위 총액 할인
+  monthlySchedule?: MonthlyScheduleEntry[] | null; // per_month_schedule 전용
 }
 
 export interface PriceInput {
@@ -117,6 +123,30 @@ function calculatePromoPrice(
     };
   }
 
+  if (promo.type === 'per_month_schedule') {
+    const schedule = Array.isArray(promo.monthlySchedule) ? promo.monthlySchedule : [];
+    let totalRental = 0;
+    for (let m = 1; m <= months; m++) {
+      const entry = schedule.find(e => Array.isArray(e.months) && e.months.includes(m));
+      const rate = entry ? clampRate(entry.rate) : 0;
+      totalRental += Math.round(priceInfo.basePrice * (1 - rate));
+    }
+    const baseRental = priceInfo.basePrice * months;
+    const effectiveRate = baseRental > 0 ? (baseRental - totalRental) / baseRental : 0;
+    const monthlyPrice = months > 0 ? Math.round(totalRental / months) : priceInfo.basePrice;
+    return {
+      cabinetSize,
+      basePrice: priceInfo.basePrice,
+      deposit: priceInfo.deposit,
+      discountRate: effectiveRate,
+      monthlyPrice,
+      billableMonths: months,
+      freeMonths: 0,
+      totalRental,
+      totalAmount: totalRental + priceInfo.deposit,
+    };
+  }
+
   if (promo.type === 'free_months') {
     const free = Math.min(Math.max(promo.freeMonths ?? 0, 0), months - 1); // 최소 1개월은 결제
     const billable = months - free;
@@ -158,6 +188,11 @@ function toNumber(v: string | number | null | undefined): number | null {
   if (typeof v === 'number') return v;
   const n = parseFloat(v);
   return Number.isFinite(n) ? n : null;
+}
+
+function clampRate(r: number): number {
+  if (!Number.isFinite(r)) return 0;
+  return Math.min(Math.max(r, 0), 1);
 }
 
 // ─────────────────────────────────────────

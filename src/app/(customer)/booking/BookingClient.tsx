@@ -22,6 +22,7 @@ interface ActivePromotion {
   discountRate: string | null;
   freeMonths: number | null;
   discountAmount: number | null;
+  monthlySchedule: { months: number[]; rate: number }[] | null;
 }
 
 function findRuleFor(size: CabinetSize, months: number, promos: ActivePromotion[]): PromotionRule | null {
@@ -34,6 +35,7 @@ function findRuleFor(size: CabinetSize, months: number, promos: ActivePromotion[
         discountRate: p.discountRate,
         freeMonths: p.freeMonths,
         discountAmount: p.discountAmount,
+        monthlySchedule: p.monthlySchedule,
       };
     }
   }

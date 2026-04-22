@@ -23,6 +23,7 @@ export async function GET() {
       discountRate: promotions.discountRate,
       freeMonths: promotions.freeMonths,
       discountAmount: promotions.discountAmount,
+      monthlySchedule: promotions.monthlySchedule,
     })
     .from(promotions)
     .where(

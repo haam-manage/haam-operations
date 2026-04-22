@@ -40,7 +40,7 @@ export async function PATCH(
   if (Number.isFinite(Number(body.priority))) patch.priority = Number(body.priority);
 
   if (body.type !== undefined) {
-    if (['discount_rate', 'free_months', 'fixed_discount'].includes(body.type)) {
+    if (['discount_rate', 'free_months', 'fixed_discount', 'per_month_schedule'].includes(body.type)) {
       patch.type = body.type as PromotionType;
     } else errors.push('type 값 오류');
   }
@@ -86,6 +86,30 @@ export async function PATCH(
       if (!Number.isInteger(a) || a < 0) errors.push('discountAmount 0 이상 정수');
       else patch.discountAmount = a;
     }
+  }
+
+  if (body.monthlySchedule !== undefined) {
+    if (body.monthlySchedule === null) patch.monthlySchedule = null;
+    else if (Array.isArray(body.monthlySchedule)) {
+      const seen = new Set<number>();
+      const out: { months: number[]; rate: number }[] = [];
+      for (const [idx, entryRaw] of body.monthlySchedule.entries()) {
+        if (!entryRaw || typeof entryRaw !== 'object') {
+          errors.push(`monthlySchedule[${idx}] 형식 오류`);
+          continue;
+        }
+        const entry = entryRaw as { months?: unknown; rate?: unknown };
+        const monthsArr = Array.isArray(entry.months)
+          ? entry.months.map(Number).filter((n: number) => Number.isInteger(n) && n >= 1 && n <= 12 && !seen.has(n))
+          : [];
+        const rate = Number(entry.rate);
+        if (monthsArr.length === 0) { errors.push(`monthlySchedule[${idx}] 적용 월 필수`); continue; }
+        if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) { errors.push(`monthlySchedule[${idx}] rate 0~1`); continue; }
+        for (const m of monthsArr) seen.add(m);
+        out.push({ months: monthsArr.sort((a: number, b: number) => a - b), rate });
+      }
+      patch.monthlySchedule = out.length > 0 ? out : null;
+    } else errors.push('monthlySchedule 배열 또는 null');
   }
 
   if (body.startsAt !== undefined) {

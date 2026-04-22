@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit2, Loader2, Power, Calendar, Tag, Percent, Gift as GiftIcon, Banknote } from 'lucide-react';
-import { PromotionForm, type PromotionFormValues, type PromotionType } from './PromotionForm';
+import { Plus, Edit2, Loader2, Power, Calendar, Tag, Percent, Gift as GiftIcon, Banknote, LayoutList } from 'lucide-react';
+import { PromotionForm, type PromotionFormValues, type PromotionType, type ScheduleEntry } from './PromotionForm';
 
 interface Row {
   id: string;
@@ -17,6 +17,7 @@ interface Row {
   discountRate: string | null;
   freeMonths: number | null;
   discountAmount: number | null;
+  monthlySchedule: ScheduleEntry[] | null;
   startsAt: string | null;
   endsAt: string | null;
 }
@@ -25,12 +26,14 @@ const TYPE_ICON: Record<PromotionType, React.ReactNode> = {
   discount_rate: <Percent className="w-3.5 h-3.5" />,
   free_months: <GiftIcon className="w-3.5 h-3.5" />,
   fixed_discount: <Banknote className="w-3.5 h-3.5" />,
+  per_month_schedule: <LayoutList className="w-3.5 h-3.5" />,
 };
 
 const TYPE_LABEL: Record<PromotionType, string> = {
   discount_rate: '할인율',
   free_months: '무료개월',
   fixed_discount: '금액할인',
+  per_month_schedule: '월별구간',
 };
 
 export function PromotionsBoard({ rows }: { rows: Row[] }) {
@@ -65,6 +68,7 @@ export function PromotionsBoard({ rows }: { rows: Row[] }) {
     discountRate: r.discountRate,
     freeMonths: r.freeMonths,
     discountAmount: r.discountAmount,
+    monthlySchedule: r.monthlySchedule,
     startsAt: r.startsAt ? r.startsAt.slice(0, 10) : null,
     endsAt: r.endsAt ? r.endsAt.slice(0, 10) : null,
   });
@@ -179,5 +183,29 @@ function ValueDisplay({ row }: { row: Row }) {
   if (row.type === 'fixed_discount' && row.discountAmount !== null) {
     return <span className="text-stone-300">₩{row.discountAmount.toLocaleString()} 할인</span>;
   }
+  if (row.type === 'per_month_schedule' && row.monthlySchedule) {
+    return (
+      <span className="text-stone-300">
+        {row.monthlySchedule
+          .map(e => `${formatMonthsRange(e.months)}=${Math.round(e.rate * 100)}%`)
+          .join(' · ')}
+      </span>
+    );
+  }
   return null;
+}
+
+function formatMonthsRange(months: number[]): string {
+  if (months.length === 0) return '';
+  const sorted = [...months].sort((a, b) => a - b);
+  const groups: string[] = [];
+  let start = sorted[0];
+  let prev = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === prev + 1) { prev = sorted[i]; continue; }
+    groups.push(start === prev ? `${start}` : `${start}~${prev}`);
+    start = sorted[i]; prev = sorted[i];
+  }
+  groups.push(start === prev ? `${start}` : `${start}~${prev}`);
+  return groups.join(',') + '달';
 }

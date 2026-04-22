@@ -8,6 +8,13 @@
       "when": 1776674988825,
       "tag": "0000_chilly_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776844325300,
+      "tag": "0001_secret_iron_lad",
+      "breakpoints": true
     }
   ]
 }

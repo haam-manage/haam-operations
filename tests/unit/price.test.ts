@@ -136,6 +136,56 @@ describe('calculatePrice — fixed_discount 룰', () => {
   });
 });
 
+describe('calculatePrice — per_month_schedule 룰', () => {
+  // 사용자 시나리오: 1개월=50%, 2~3개월=20% → 3개월 계약 시 35 + 56 + 56 = 147,000
+  const rule: PromotionRule = {
+    type: 'per_month_schedule',
+    monthlySchedule: [
+      { months: [1], rate: 0.5 },
+      { months: [2, 3], rate: 0.2 },
+    ],
+  };
+
+  it('M / 1개월 계약 → 35,000', () => {
+    const r = calculatePrice({ cabinetSize: 'M', months: 1, promotion: rule });
+    expect(r.totalRental).toBe(35_000);
+    expect(r.totalAmount).toBe(105_000); // + 보증금 70,000
+  });
+
+  it('M / 2개월 계약 → 35,000 + 56,000 = 91,000', () => {
+    const r = calculatePrice({ cabinetSize: 'M', months: 2, promotion: rule });
+    expect(r.totalRental).toBe(91_000);
+    expect(r.totalAmount).toBe(161_000);
+  });
+
+  it('M / 3개월 계약 → 35,000 + 56,000 + 56,000 = 147,000', () => {
+    const r = calculatePrice({ cabinetSize: 'M', months: 3, promotion: rule });
+    expect(r.totalRental).toBe(147_000);
+    expect(r.totalAmount).toBe(217_000);
+    expect(r.billableMonths).toBe(3);
+    expect(r.freeMonths).toBe(0);
+  });
+
+  it('L / 3개월 계약 → 사이즈 별 등비율 적용', () => {
+    const r = calculatePrice({ cabinetSize: 'L', months: 3, promotion: rule });
+    // 60,000 + 96,000 + 96,000 = 252,000
+    expect(r.totalRental).toBe(252_000);
+  });
+
+  it('스케줄에 없는 월은 정가 (할인 0%)', () => {
+    // 4개월 계약: 1=50%, 2=20%, 3=20%, 4=정가
+    const r = calculatePrice({ cabinetSize: 'M', months: 4, promotion: rule });
+    expect(r.totalRental).toBe(35_000 + 56_000 + 56_000 + 70_000); // 217,000
+  });
+
+  it('빈 스케줄 → 전 구간 정가', () => {
+    const empty: PromotionRule = { type: 'per_month_schedule', monthlySchedule: [] };
+    const r = calculatePrice({ cabinetSize: 'M', months: 3, promotion: empty });
+    expect(r.totalRental).toBe(210_000); // 70k × 3
+    expect(r.discountRate).toBe(0);
+  });
+});
+
 describe('extractCabinetSize', () => {
   it('M01 → M', () => expect(extractCabinetSize('M01')).toBe('M'));
   it('L13 → L', () => expect(extractCabinetSize('L13')).toBe('L'));

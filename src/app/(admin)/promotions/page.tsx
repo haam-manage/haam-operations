@@ -44,6 +44,7 @@ export default async function PromotionsPage() {
     discountRate: r.discountRate,
     freeMonths: r.freeMonths,
     discountAmount: r.discountAmount,
+    monthlySchedule: (r.monthlySchedule as { months: number[]; rate: number }[] | null) ?? null,
     startsAt: r.startsAt ? r.startsAt.toISOString() : null,
     endsAt: r.endsAt ? r.endsAt.toISOString() : null,
   }));

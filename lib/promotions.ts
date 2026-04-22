@@ -68,6 +68,7 @@ export function toPromotionRule(p: Promotion | null): PromotionRule | null {
     discountRate: p.discountRate,
     freeMonths: p.freeMonths,
     discountAmount: p.discountAmount,
+    monthlySchedule: (p.monthlySchedule as { months: number[]; rate: number }[] | null) ?? null,
   };
 }
 
