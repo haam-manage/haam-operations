@@ -189,13 +189,20 @@ export async function GET(request: Request) {
     // 3. 만료된 보증금 반환 토큰 정리 (7일)
     // 토큰만 무효화, 레코드는 유지 (감사 추적)
 
-    // 텔레그램 배치 완료 알림
-    await notifyEvent('batch_complete', {
-      날짜: today,
-      처리건수: results.processed,
-      알림톡발송: results.alimtalkSent,
-      오류: results.errors.length,
-    });
+    // 텔레그램 배치 완료 알림 — 처리·오류·토큰 만료 중 하나라도 있을 때만
+    const hasActivity =
+      results.processed > 0 ||
+      results.errors.length > 0 ||
+      results.tokensExpired > 0;
+    if (hasActivity) {
+      await notifyEvent('batch_complete', {
+        날짜: today,
+        처리건수: results.processed,
+        알림톡발송: results.alimtalkSent,
+        토큰만료: results.tokensExpired,
+        오류: results.errors.length,
+      });
+    }
 
   } catch (err) {
     await notifyEvent('batch_failed', {
