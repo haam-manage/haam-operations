@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit2, Loader2, Power, Calendar, Tag, Percent, Gift as GiftIcon, Banknote, LayoutList, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Loader2, Power, Calendar, Tag, Percent, Gift as GiftIcon, Banknote, LayoutList, Trash2, Copy } from 'lucide-react';
 import { PromotionForm, type PromotionFormValues, type PromotionType, type ScheduleEntry } from './PromotionForm';
 
 interface Row {
@@ -39,7 +39,7 @@ const TYPE_LABEL: Record<PromotionType, string> = {
 export function PromotionsBoard({ rows }: { rows: Row[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<boolean | PromotionFormValues>(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -117,11 +117,27 @@ export function PromotionsBoard({ rows }: { rows: Row[] }) {
     endsAt: r.endsAt ? r.endsAt.slice(0, 10) : null,
   });
 
+  const clone = (row: Row) => {
+    setEditing(null);
+    setCreating({
+      ...toFormValues(row),
+      id: undefined,
+      name: `${row.name} (복사본)`,
+      isActive: false,
+    });
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Create */}
       {creating ? (
-        <PromotionForm onCancel={() => setCreating(false)} />
+        <PromotionForm
+          initial={typeof creating === 'object' ? creating : undefined}
+          onCancel={() => setCreating(false)}
+        />
       ) : (
         <button
           type="button"
@@ -239,6 +255,15 @@ export function PromotionsBoard({ rows }: { rows: Row[] }) {
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                       수정
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => clone(row)}
+                      title="복제"
+                      aria-label="복제"
+                      className="touch-target inline-flex items-center justify-center w-9 h-9 rounded-lg text-stone-400 hover:text-amber-400 hover:bg-white/5 transition-colors"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   </div>
