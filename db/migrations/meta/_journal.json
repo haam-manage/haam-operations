@@ -15,6 +15,13 @@
       "when": 1776844325300,
       "tag": "0001_secret_iron_lad",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777089600000,
+      "tag": "0002_enable_rls",
+      "breakpoints": true
     }
   ]
 }
