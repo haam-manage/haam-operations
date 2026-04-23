@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, MapPin, Info, Ticket } from 'lucide-react';
+import { ArrowRight, MapPin, Info, Ticket, Gift } from 'lucide-react';
 
 const SLIDES = [
   { src: '/images/1.png', caption: '숭실대입구역 도보 3분', subcaption: '출퇴근 길에 자연스럽게' },
@@ -119,17 +119,43 @@ export default function SplashPage() {
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.6 }}
-              className="flex items-center justify-center"
+              transition={{ delay: 0.3, duration: 0.7 }}
+              className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-900/45 via-stone-900/55 to-orange-950/45 backdrop-blur-xl shadow-[0_8px_32px_-8px_rgba(251,146,60,0.35)]"
             >
-              <div className="inline-flex items-center gap-2 py-1.5 px-3 rounded-full border border-amber-500/30 bg-gradient-to-r from-amber-950/70 via-amber-900/50 to-amber-950/70 backdrop-blur-md shadow-lg shadow-amber-500/10">
-                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold tracking-[0.15em] text-amber-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  LIVE
-                </span>
-                <span className="text-[11px] font-medium text-white/95 max-w-[70vw] truncate">
-                  {banner.label}
-                </span>
+              {/* Ambient glows */}
+              <div className="pointer-events-none absolute -top-8 -right-8 w-36 h-36 rounded-full bg-amber-500/30 blur-3xl animate-pulse" />
+              <div className="pointer-events-none absolute -bottom-8 -left-8 w-28 h-28 rounded-full bg-orange-500/20 blur-3xl" />
+              {/* Top accent line */}
+              <div className="pointer-events-none absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
+
+              <div className="relative flex items-center gap-3 p-3.5">
+                {/* Icon */}
+                <div className="relative shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-300 via-orange-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-500/40">
+                    <Gift className="w-6 h-6 text-black/85" strokeWidth={2.5} />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 ring-2 ring-[#0c0a09] animate-pulse" />
+                </div>
+
+                {/* Copy */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-500/90 text-white text-[8px] font-extrabold tracking-[0.15em]">
+                      <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
+                      LIVE
+                    </span>
+                    <span className="text-[9px] uppercase tracking-[0.15em] text-amber-400/90 font-semibold">
+                      오늘의 특가
+                    </span>
+                  </div>
+                  <div className="text-[15px] font-bold text-white leading-tight truncate">
+                    {banner.label}
+                  </div>
+                  <div className="text-[10px] text-amber-300/90 mt-0.5 flex items-center gap-1">
+                    지금 시작하면 즉시 적용
+                    <ArrowRight className="w-3 h-3" />
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}
@@ -140,6 +166,15 @@ export default function SplashPage() {
           >
             시작하기
             <ArrowRight className="w-5 h-5" />
+          </Link>
+
+          <Link
+            href="/my"
+            className="group w-full flex items-center justify-center gap-2 py-4 px-8 text-base font-medium rounded-[0.875rem] border border-amber-500/30 bg-amber-950/20 backdrop-blur-md text-amber-200 hover:bg-amber-950/40 hover:border-amber-500/50 hover:text-amber-100 transition-all"
+          >
+            <Ticket className="w-5 h-5" />
+            내 예약 조회
+            <ArrowRight className="w-4 h-4 opacity-70 group-hover:translate-x-0.5 transition-transform" />
           </Link>
 
           <div className="flex gap-3">
@@ -160,20 +195,6 @@ export default function SplashPage() {
               오시는 길
             </a>
           </div>
-
-          <Link
-            href="/my"
-            className="group flex items-center gap-3 py-3 px-4 rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur-md hover:border-amber-500/40 hover:bg-amber-950/20 transition-all"
-          >
-            <div className="w-9 h-9 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0 group-hover:bg-amber-500/25 transition-colors">
-              <Ticket className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="flex-1 text-left leading-tight">
-              <div className="text-[10px] text-stone-500 uppercase tracking-[0.15em]">Membership</div>
-              <div className="text-sm font-semibold text-white">내 예약 조회</div>
-            </div>
-            <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
-          </Link>
         </div>
       </motion.div>
     </main>

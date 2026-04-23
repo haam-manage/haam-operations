@@ -243,6 +243,9 @@ export const promotions = pgTable('promotions', {
   // 고객 사이즈 카드 뱃지 문구 (예: "첫 달 반값"). 비우면 자동 생성.
   // Step 1 상단 배너는 별도 banners 테이블에서 관리 — 프로모션과 독립된 시즌 메시지.
   badgeLabel: varchar('badge_label', { length: 50 }),
+  // 고객 상세 할인 설명 (Step 3 칩 + Step 1 가격표 행). 비우면 describePromotionPlan() 자동 조합.
+  // 예: "첫달 50% + 3~5개월 20%" / "신규 회원 한정 특가" 같은 마케팅 문구.
+  planLabel: varchar('plan_label', { length: 200 }),
   type: promotionTypeEnum('type').notNull(),
   isActive: boolean('is_active').default(false).notNull(),
   priority: integer('priority').default(0).notNull(), // 높을수록 우선

@@ -15,6 +15,7 @@ export interface PromotionFormValues {
   id?: string;
   name: string;
   badgeLabel: string | null;
+  planLabel: string | null;
   type: PromotionType;
   isActive: boolean;
   priority: number;
@@ -32,6 +33,7 @@ export interface PromotionFormValues {
 const EMPTY: PromotionFormValues = {
   name: '',
   badgeLabel: null,
+  planLabel: null,
   type: 'discount_rate',
   isActive: false,
   priority: 0,
@@ -65,6 +67,7 @@ export function PromotionForm({
     const payload: Record<string, unknown> = {
       name: v.name.trim(),
       badgeLabel: v.badgeLabel?.trim() || null,
+      planLabel: v.planLabel?.trim() || null,
       type: v.type,
       isActive: v.isActive,
       priority: Number(v.priority) || 0,
@@ -151,6 +154,16 @@ export function PromotionForm({
           onChange={e => setV({ ...v, badgeLabel: e.target.value || null })}
           placeholder="예: 첫 달 반값"
           maxLength={50}
+          className="input-dark w-full px-3 py-2 text-sm"
+        />
+      </Field>
+
+      <Field label="할인 설명 문구 — Step 3 칩 + Step 1 가격표 (선택, 비우면 자동: '첫달 50% + 3~5개월 20%' 등)">
+        <input
+          value={v.planLabel ?? ''}
+          onChange={e => setV({ ...v, planLabel: e.target.value || null })}
+          placeholder="예: 신규 회원 한정 특가"
+          maxLength={200}
           className="input-dark w-full px-3 py-2 text-sm"
         />
       </Field>

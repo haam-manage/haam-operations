@@ -17,6 +17,7 @@ interface ActivePromotion {
   id: string;
   name: string;
   badgeLabel: string | null;
+  planLabel: string | null;
   type: PromotionType;
   priority: number;
   applicableSizes: CabinetSize[] | null;
@@ -93,21 +94,28 @@ function formatScheduleBadge(months: number[], rate: number): string {
   return `${groups.join(',')}개월 ${pct}%`;
 }
 
-function findRuleFor(size: CabinetSize, months: number, promos: ActivePromotion[]): PromotionRule | null {
+function findPromoFor(size: CabinetSize, months: number, promos: ActivePromotion[]): ActivePromotion | null {
   for (const p of promos) {
     const sizeOk = !p.applicableSizes || p.applicableSizes.includes(size);
     const monthsOk = !p.applicableMonths || p.applicableMonths.includes(months);
-    if (sizeOk && monthsOk) {
-      return {
-        type: p.type,
-        discountRate: p.discountRate,
-        freeMonths: p.freeMonths,
-        discountAmount: p.discountAmount,
-        monthlySchedule: p.monthlySchedule,
-      };
-    }
+    if (sizeOk && monthsOk) return p;
   }
   return null;
+}
+
+function toPromotionRule(p: ActivePromotion): PromotionRule {
+  return {
+    type: p.type,
+    discountRate: p.discountRate,
+    freeMonths: p.freeMonths,
+    discountAmount: p.discountAmount,
+    monthlySchedule: p.monthlySchedule,
+  };
+}
+
+function findRuleFor(size: CabinetSize, months: number, promos: ActivePromotion[]): PromotionRule | null {
+  const p = findPromoFor(size, months, promos);
+  return p ? toPromotionRule(p) : null;
 }
 
 interface PriceBreakdown {
@@ -204,6 +212,24 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
     (async () => {
       const { loadTossPayments } = await import('@tosspayments/tosspayments-sdk');
       const tossPayments = await loadTossPayments(clientKey);
+      if (cancelled) return;
+
+      // StepLayout 의 AnimatePresence exit 애니메이션이 끝나기 전에 effect 가 먼저 발화하면
+      // 마운트 targets(#toss-payment-methods/#toss-agreement) 가 아직 DOM 에 없음.
+      // 요소가 나타날 때까지 rAF 로 대기 (최대 ~500ms).
+      await new Promise<void>((resolve, reject) => {
+        let attempts = 0;
+        const check = () => {
+          if (cancelled) return resolve();
+          if (
+            document.getElementById('toss-payment-methods') &&
+            document.getElementById('toss-agreement')
+          ) return resolve();
+          if (++attempts > 30) return reject(new Error('결제 위젯 DOM 마운트 대기 시간 초과'));
+          requestAnimationFrame(check);
+        };
+        check();
+      });
       if (cancelled) return;
 
       const widgets = tossPayments.widgets({ customerKey: customerId });
@@ -347,57 +373,66 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
           })}
         </div>
 
-        {/* 전체 가격 한눈에 — 사이즈 × 기간 월납 요약 */}
+        {/* 전체 가격표 — 기간 × 사이즈 풀 조합 */}
         <div className="mt-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-            <span className="text-[10px] uppercase tracking-[0.2em] text-stone-500">전체 가격 한눈에</span>
+            <span className="text-[10px] uppercase tracking-[0.2em] text-stone-500">전체 가격표</span>
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
           </div>
 
-          <div className="glass rounded-2xl p-3">
-            <table className="w-full">
-              <thead>
-                <tr className="text-[10px] uppercase tracking-wider text-stone-500">
-                  <th className="text-left pb-2 pl-1 font-medium">사이즈</th>
-                  {[1, 3, 6, 12].map(m => (
-                    <th key={m} className="text-right pb-2 pr-1 font-medium">{m}개월</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
+          <div className="glass rounded-2xl overflow-hidden">
+            {/* Header row */}
+            <div className="grid grid-cols-[44px_1fr_1fr_1fr] bg-white/[0.03] border-b border-white/5">
+              <div className="px-1.5 py-2 text-[9px] uppercase tracking-wider text-stone-500 font-medium">기간</div>
+              {(['M', 'L', 'XL'] as CabinetSize[]).map(size => (
+                <div key={size} className="px-1.5 py-2 text-center border-l border-white/5">
+                  <div className="text-[10px] text-stone-400 font-semibold">
+                    <span className="text-amber-400">{size}</span> {SIZE_INFO[size].name}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Body rows */}
+            {[1, 3, 6, 12].map(m => (
+              <div
+                key={m}
+                className="grid grid-cols-[44px_1fr_1fr_1fr] border-b border-white/5 last:border-b-0"
+              >
+                <div className="px-1.5 py-2.5 flex items-center text-[11px] font-semibold text-white">
+                  {m}개월
+                </div>
                 {(['M', 'L', 'XL'] as CabinetSize[]).map(size => {
-                  const info = SIZE_INFO[size];
+                  const promo = findPromoFor(size, m, activePromos);
+                  const rule = promo ? toPromotionRule(promo) : null;
+                  const p = calculatePrice({ cabinetSize: size, months: m, promotion: rule });
+                  const breakdown = describePromotionPlan(rule, m, promo?.planLabel);
+                  const discountPct = Math.round(p.discountRate * 100);
                   return (
-                    <tr key={size}>
-                      <td className="py-2 pl-1">
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-xs font-semibold text-white">{info.name}</span>
-                          <span className="text-[10px] text-stone-600">{size}</span>
+                    <div key={size} className="px-1.5 py-2.5 border-l border-white/5">
+                      <div className="text-[12px] font-bold text-white tabular-nums leading-tight">
+                        ₩{p.totalRental.toLocaleString()}
+                      </div>
+                      <div className="text-[9px] text-stone-500 leading-tight mt-0.5 tabular-nums">
+                        월 ₩{p.monthlyPrice.toLocaleString()}
+                        {discountPct > 0 && <> · <span className="text-stone-400">{discountPct}% 할인</span></>}
+                      </div>
+                      {breakdown && (
+                        <div className="mt-1 flex items-start gap-0.5 text-[9px] font-medium text-amber-400/90 leading-tight">
+                          <Sparkles className="w-2.5 h-2.5 mt-px shrink-0" />
+                          <span>{breakdown}</span>
                         </div>
-                      </td>
-                      {[1, 3, 6, 12].map(m => {
-                        const rule = findRuleFor(size, m, activePromos);
-                        const p = calculatePrice({ cabinetSize: size, months: m, promotion: rule });
-                        const monthly = p.monthlyPrice;
-                        const hasDiscount = p.discountRate > 0 || p.freeMonths > 0;
-                        return (
-                          <td key={m} className="text-right pr-1 py-2 tabular-nums">
-                            <div className={`text-xs font-semibold ${hasDiscount ? 'gradient-text-warm' : 'text-stone-200'}`}>
-                              {Math.round(monthly / 1000)}k
-                            </div>
-                            <div className="text-[9px] text-stone-600 leading-none">/월</div>
-                          </td>
-                        );
-                      })}
-                    </tr>
+                      )}
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-            <p className="mt-2.5 pt-2 border-t border-white/5 text-[10px] text-stone-500 text-center">
-              * 보증금 별도 · 프로모션/장기할인 자동 적용
-            </p>
+              </div>
+            ))}
+
+            <div className="px-3 py-2 text-[10px] text-stone-500 text-center bg-white/[0.02]">
+              * 보증금 별도 · {activePromos.length > 0 ? '프로모션 적용 중' : '장기할인 자동 적용'}
+            </div>
           </div>
         </div>
       </StepLayout>
@@ -504,7 +539,11 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
   if (step === 3) {
     const dec = () => { if (months > MIN_MONTHS) { setMonths(months - 1); haptic(); } };
     const inc = () => { if (months < MAX_MONTHS) { setMonths(months + 1); haptic(); } };
-    const discountLabel = estimate ? describeDiscount(estimate) : '';
+    const step3Promo = selectedSize ? findPromoFor(selectedSize, months, activePromos) : null;
+    const step3Rule = step3Promo ? toPromotionRule(step3Promo) : null;
+    const promoBreakdown = describePromotionPlan(step3Rule, months, step3Promo?.planLabel);
+    // 프로모션 rule 이 있으면 조합 문구, 없으면 장기할인 blended rate fallback.
+    const discountLabel = promoBreakdown || (estimate ? describeDiscount(estimate) : '');
 
     return (
       <StepLayout
@@ -585,20 +624,50 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
             </div>
           </div>
 
-          {/* Price preview */}
+          {/* Price preview — 월별 상세 */}
           {estimate && selectedSize && (
-            <div className="glass-warm p-4 space-y-1.5">
-              <div className="flex justify-between items-center">
+            <div className="glass-warm p-4 space-y-3">
+              {/* 총액 */}
+              <div className="flex justify-between items-center pb-3 border-b border-amber-500/15">
                 <span className="text-sm text-stone-400">예상 결제금액</span>
-                <span className="text-lg font-bold text-white">₩{estimate.totalAmount.toLocaleString()}</span>
+                <span className="text-xl font-bold gradient-text-warm tabular-nums">₩{estimate.totalAmount.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-xs text-stone-600">
-                <span>렌탈 {estimate.billableMonths}개월{estimate.freeMonths > 0 ? ` + ${estimate.freeMonths}개월 무료` : ''}</span>
-                <span>₩{estimate.totalRental.toLocaleString()}</span>
+
+              {/* 월별 렌탈료 */}
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.15em] text-stone-500 mb-2">월별 렌탈료</div>
+                <div className="space-y-1">
+                  {buildMonthlyRental(selectedSize, months, step3Rule).map(line => {
+                    const pct = Math.round(line.rate * 100);
+                    return (
+                      <div key={line.month} className="flex justify-between items-center text-xs">
+                        <span className="flex items-center gap-2">
+                          <span className="text-stone-400 tabular-nums">렌탈 {line.month}개월차</span>
+                          {line.free ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-green-500/15 text-green-300 text-[10px] font-semibold">무료</span>
+                          ) : pct > 0 ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-300 text-[10px] font-semibold">{pct}% 할인</span>
+                          ) : null}
+                        </span>
+                        <span className={`tabular-nums ${line.free ? 'text-green-400' : 'text-stone-200'}`}>
+                          ₩{line.amount.toLocaleString()}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="flex justify-between text-xs text-stone-600">
-                <span>보증금</span>
-                <span>₩{estimate.deposit.toLocaleString()}</span>
+
+              {/* 합계 + 보증금 */}
+              <div className="pt-2 border-t border-amber-500/15 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-stone-400">렌탈료 합계</span>
+                  <span className="text-stone-200 tabular-nums">₩{estimate.totalRental.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-500">보증금 <span className="text-stone-600">(환급)</span></span>
+                  <span className="text-stone-400 tabular-nums">₩{estimate.deposit.toLocaleString()}</span>
+                </div>
               </div>
             </div>
           )}
@@ -703,11 +772,17 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
 
   // ─── Step 5: Payment (Toss Widget) ───
   if (step === 5) {
+    const backToReview = () => {
+      widgetsRef.current = null;
+      setWidgetsReady(false);
+      goTo(4, 'back');
+    };
     return (
       <StepLayout
         step={5} totalSteps={6}
         title="결제"
         subtitle="Step 5 · 결제"
+        onBack={backToReview}
         direction={direction}
         bottomCTA={
           <Button
@@ -878,6 +953,118 @@ function describeDiscount(result: PriceResult): string {
     return `${Math.round(result.discountRate * 100)}% 할인 적용`;
   }
   return '';
+}
+
+/**
+ * 프로모션 rule 을 사람이 이해하는 조합 문자열로 풀어 표시.
+ * 예: "첫달 50% + 3~5개월 20%" — blended rate 대신 구간별 원본을 보여주므로
+ * "2개월=33% 할인" 같이 혼란스러운 표현을 피한다.
+ *
+ * override: 관리자가 입력한 planLabel 이 있으면 자동 조합 대신 그 문구 사용.
+ */
+function describePromotionPlan(rule: PromotionRule | null, months: number, override?: string | null): string {
+  const trimmed = override?.trim();
+  if (trimmed) return trimmed;
+  if (!rule) return '';
+  if (rule.type === 'discount_rate') {
+    const r = Math.round(Number(rule.discountRate ?? 0) * 100);
+    return r > 0 ? `전 기간 ${r}% 할인` : '';
+  }
+  if (rule.type === 'free_months' && rule.freeMonths) {
+    return `${rule.freeMonths}개월 무료`;
+  }
+  if (rule.type === 'fixed_discount' && rule.discountAmount) {
+    return `₩${rule.discountAmount.toLocaleString()} 할인`;
+  }
+  if (rule.type === 'per_month_schedule') {
+    const schedule = Array.isArray(rule.monthlySchedule) ? rule.monthlySchedule : [];
+    const parts: string[] = [];
+    for (const entry of schedule) {
+      const overlapping = entry.months.filter(m => m >= 1 && m <= months);
+      if (overlapping.length === 0) continue;
+      const rate = Math.round(entry.rate * 100);
+      parts.push(`${formatMonthSpan(overlapping)} ${rate}%`);
+    }
+    return parts.join(' + ');
+  }
+  return '';
+}
+
+interface MonthlyLine {
+  month: number;
+  rate: number;     // 0~1
+  amount: number;   // 해당 월 납입액 (무료월은 0)
+  free: boolean;
+}
+
+/**
+ * 월별 납입 라인을 분해. 모든 프로모션 타입을 지원.
+ * - per_month_schedule: 월별 개별 rate
+ * - free_months: 앞 N개월 정가, 뒤 free개월 0원
+ * - discount_rate: 전 기간 동일 rate
+ * - fixed_discount: 총액 할인을 균등 분산
+ * - null: 장기할인 tier rate 동일 적용
+ */
+function buildMonthlyRental(size: CabinetSize, months: number, rule: PromotionRule | null): MonthlyLine[] {
+  const base = SIZE_INFO[size].price;
+  const lines: MonthlyLine[] = [];
+
+  if (!rule) {
+    const p = calculatePrice({ cabinetSize: size, months, promotion: null });
+    for (let m = 1; m <= months; m++) {
+      lines.push({ month: m, rate: p.discountRate, amount: Math.round(base * (1 - p.discountRate)), free: false });
+    }
+    return lines;
+  }
+
+  if (rule.type === 'discount_rate') {
+    const rate = Math.min(Math.max(Number(rule.discountRate ?? 0), 0), 1);
+    for (let m = 1; m <= months; m++) {
+      lines.push({ month: m, rate, amount: Math.round(base * (1 - rate)), free: false });
+    }
+    return lines;
+  }
+
+  if (rule.type === 'free_months') {
+    const free = Math.min(Math.max(rule.freeMonths ?? 0, 0), months - 1);
+    const paid = months - free;
+    for (let m = 1; m <= paid; m++) lines.push({ month: m, rate: 0, amount: base, free: false });
+    for (let m = paid + 1; m <= months; m++) lines.push({ month: m, rate: 1, amount: 0, free: true });
+    return lines;
+  }
+
+  if (rule.type === 'per_month_schedule') {
+    const schedule = Array.isArray(rule.monthlySchedule) ? rule.monthlySchedule : [];
+    for (let m = 1; m <= months; m++) {
+      const entry = schedule.find(e => e.months.includes(m));
+      const rate = entry?.rate ?? 0;
+      lines.push({ month: m, rate, amount: Math.round(base * (1 - rate)), free: false });
+    }
+    return lines;
+  }
+
+  // fixed_discount: 균등 분산
+  const amount = Math.max(rule.discountAmount ?? 0, 0);
+  const baseRental = base * months;
+  const totalRental = Math.max(baseRental - amount, 0);
+  const effectiveRate = baseRental > 0 ? (baseRental - totalRental) / baseRental : 0;
+  const perMonth = Math.round(totalRental / months);
+  for (let m = 1; m <= months; m++) {
+    lines.push({ month: m, rate: effectiveRate, amount: perMonth, free: false });
+  }
+  return lines;
+}
+
+function formatMonthSpan(months: number[]): string {
+  if (months.length === 0) return '';
+  const sorted = [...months].sort((a, b) => a - b);
+  const isSequential = sorted.every((m, i) => i === 0 || m === sorted[i - 1] + 1);
+  if (isSequential) {
+    if (sorted.length === 1) return sorted[0] === 1 ? '첫달' : `${sorted[0]}개월`;
+    if (sorted[0] === 1) return `첫 ${sorted[sorted.length - 1]}개월`;
+    return `${sorted[0]}~${sorted[sorted.length - 1]}개월`;
+  }
+  return sorted.join(',') + '개월';
 }
 
 function formatPhoneDisplay(phone: string): string {

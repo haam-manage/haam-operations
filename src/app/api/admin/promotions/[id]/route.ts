@@ -43,6 +43,14 @@ export async function PATCH(
       else patch.badgeLabel = s || null;
     } else errors.push('badgeLabel 문자열 또는 null');
   }
+  if (body.planLabel !== undefined) {
+    if (body.planLabel === null || body.planLabel === '') patch.planLabel = null;
+    else if (typeof body.planLabel === 'string') {
+      const s = body.planLabel.trim();
+      if (s.length > 200) errors.push('planLabel 200자 이내');
+      else patch.planLabel = s || null;
+    } else errors.push('planLabel 문자열 또는 null');
+  }
   if (typeof body.isActive === 'boolean') patch.isActive = body.isActive;
   if (typeof body.isNewOnly === 'boolean') patch.isNewOnly = body.isNewOnly;
   if (Number.isFinite(Number(body.priority))) patch.priority = Number(body.priority);

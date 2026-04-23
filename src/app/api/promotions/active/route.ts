@@ -17,6 +17,7 @@ export async function GET() {
       id: promotions.id,
       name: promotions.name,
       badgeLabel: promotions.badgeLabel,
+      planLabel: promotions.planLabel,
       type: promotions.type,
       priority: promotions.priority,
       applicableSizes: promotions.applicableSizes,

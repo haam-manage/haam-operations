@@ -41,6 +41,7 @@ export default async function PromotionsPage() {
     id: r.id,
     name: r.name,
     badgeLabel: r.badgeLabel,
+    planLabel: r.planLabel,
     type: r.type,
     isActive: r.isActive,
     priority: r.priority,

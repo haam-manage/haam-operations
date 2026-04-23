@@ -9,6 +9,7 @@ interface Row {
   id: string;
   name: string;
   badgeLabel: string | null;
+  planLabel: string | null;
   type: PromotionType;
   isActive: boolean;
   priority: number;
@@ -105,6 +106,7 @@ export function PromotionsBoard({ rows }: { rows: Row[] }) {
     id: r.id,
     name: r.name,
     badgeLabel: r.badgeLabel,
+    planLabel: r.planLabel,
     type: r.type,
     isActive: r.isActive,
     priority: r.priority,

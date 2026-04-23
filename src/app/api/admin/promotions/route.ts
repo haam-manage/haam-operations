@@ -18,6 +18,10 @@ function parseBody(body: any) {
   if (badgeLabelRaw.length > 50) errors.push('badgeLabel 50자 이내');
   const badgeLabel = badgeLabelRaw || null;
 
+  const planLabelRaw = typeof body?.planLabel === 'string' ? body.planLabel.trim() : '';
+  if (planLabelRaw.length > 200) errors.push('planLabel 200자 이내');
+  const planLabel = planLabelRaw || null;
+
   const type = body?.type as PromotionType;
   if (!['discount_rate', 'free_months', 'fixed_discount', 'per_month_schedule'].includes(type)) {
     errors.push('type 필수(discount_rate|free_months|fixed_discount|per_month_schedule)');
@@ -68,7 +72,7 @@ function parseBody(body: any) {
   return {
     errors,
     values: {
-      name, badgeLabel, type, isActive, priority, isNewOnly,
+      name, badgeLabel, planLabel, type, isActive, priority, isNewOnly,
       applicableSizes, applicableMonths,
       discountRate, freeMonths, discountAmount, monthlySchedule,
       startsAt, endsAt,
