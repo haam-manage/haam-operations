@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, LogOut } from 'lucide-react';
+import { ArrowLeft, LogOut, Home } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -11,13 +11,14 @@ interface StepLayoutProps {
   title: string;
   subtitle?: string;
   onBack?: () => void;
+  onHome?: () => void;
   children: React.ReactNode;
   bottomCTA?: React.ReactNode;
   direction?: 'forward' | 'back';
   showLogout?: boolean;
 }
 
-export function StepLayout({ step, totalSteps, title, subtitle, onBack, children, bottomCTA, direction = 'forward', showLogout = true }: StepLayoutProps) {
+export function StepLayout({ step, totalSteps, title, subtitle, onBack, onHome, children, bottomCTA, direction = 'forward', showLogout = true }: StepLayoutProps) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -38,8 +39,12 @@ export function StepLayout({ step, totalSteps, title, subtitle, onBack, children
       <header className="sticky top-0 z-40 bg-[#0c0a09]/90 backdrop-blur-lg border-b border-white/5 safe-top">
         <div className="max-w-lg mx-auto px-5 py-3 flex items-center justify-between">
           {onBack ? (
-            <button onClick={onBack} className="touch-target w-10 h-10 -ml-2 text-stone-400">
+            <button onClick={onBack} aria-label="뒤로" className="touch-target w-10 h-10 -ml-2 text-stone-400">
               <ArrowLeft className="w-5 h-5" />
+            </button>
+          ) : onHome ? (
+            <button onClick={onHome} aria-label="홈" className="touch-target w-10 h-10 -ml-2 text-stone-400 hover:text-amber-400 transition-colors">
+              <Home className="w-5 h-5" />
             </button>
           ) : (
             <div className="w-10" />

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Check, CreditCard, Lock, ChevronRight, Package, Calendar, Mail, Minus, Plus, ShieldCheck, Gift, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
@@ -137,6 +138,7 @@ const MIN_MONTHS = 1;
 const MAX_MONTHS = 12;
 
 export function BookingClient({ customerId, name, phone, email: initialEmail }: BookingClientProps) {
+  const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [selectedSize, setSelectedSize] = useState<CabinetSize | null>(null);
@@ -249,6 +251,7 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
         step={1} totalSteps={6}
         title="어떤 크기가 필요하세요?"
         subtitle="Step 1 · 사이즈"
+        onHome={() => router.push('/')}
         bottomCTA={
           <Button
             variant="primary"
@@ -305,11 +308,6 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
               >
                 <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 relative">
                   <Image src={info.image} alt={size} fill className="object-cover" />
-                  {discount && (
-                    <div className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-md bg-gradient-to-br from-rose-500 to-red-600 text-white text-[9px] font-extrabold shadow-lg shadow-red-500/40">
-                      -{Math.round(discount.maxRate * 100)}%
-                    </div>
-                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -347,6 +345,60 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
               </button>
             );
           })}
+        </div>
+
+        {/* 전체 가격 한눈에 — 사이즈 × 기간 월납 요약 */}
+        <div className="mt-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            <span className="text-[10px] uppercase tracking-[0.2em] text-stone-500">전체 가격 한눈에</span>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          </div>
+
+          <div className="glass rounded-2xl p-3">
+            <table className="w-full">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wider text-stone-500">
+                  <th className="text-left pb-2 pl-1 font-medium">사이즈</th>
+                  {[1, 3, 6, 12].map(m => (
+                    <th key={m} className="text-right pb-2 pr-1 font-medium">{m}개월</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {(['M', 'L', 'XL'] as CabinetSize[]).map(size => {
+                  const info = SIZE_INFO[size];
+                  return (
+                    <tr key={size}>
+                      <td className="py-2 pl-1">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-xs font-semibold text-white">{info.name}</span>
+                          <span className="text-[10px] text-stone-600">{size}</span>
+                        </div>
+                      </td>
+                      {[1, 3, 6, 12].map(m => {
+                        const rule = findRuleFor(size, m, activePromos);
+                        const p = calculatePrice({ cabinetSize: size, months: m, promotion: rule });
+                        const monthly = p.monthlyPrice;
+                        const hasDiscount = p.discountRate > 0 || p.freeMonths > 0;
+                        return (
+                          <td key={m} className="text-right pr-1 py-2 tabular-nums">
+                            <div className={`text-xs font-semibold ${hasDiscount ? 'gradient-text-warm' : 'text-stone-200'}`}>
+                              {Math.round(monthly / 1000)}k
+                            </div>
+                            <div className="text-[9px] text-stone-600 leading-none">/월</div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className="mt-2.5 pt-2 border-t border-white/5 text-[10px] text-stone-500 text-center">
+              * 보증금 별도 · 프로모션/장기할인 자동 적용
+            </p>
+          </div>
         </div>
       </StepLayout>
     );

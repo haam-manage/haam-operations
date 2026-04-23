@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, MapPin, Info } from 'lucide-react';
+import { ArrowRight, MapPin, Info, Ticket } from 'lucide-react';
 
 const SLIDES = [
   { src: '/images/1.png', caption: '숭실대입구역 도보 3분', subcaption: '출퇴근 길에 자연스럽게' },
@@ -14,12 +14,22 @@ const SLIDES = [
 
 export default function SplashPage() {
   const [index, setIndex] = useState(0);
+  const [banner, setBanner] = useState<{ id: string; label: string } | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setIndex(i => (i + 1) % SLIDES.length);
     }, 5000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/banner/active')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.banner) setBanner(data.banner as { id: string; label: string });
+      })
+      .catch(() => {});
   }, []);
 
   return (
@@ -105,6 +115,25 @@ export default function SplashPage() {
         className="relative z-10 p-6 pb-10 safe-bottom"
       >
         <div className="max-w-md mx-auto space-y-3">
+          {banner && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.6 }}
+              className="flex items-center justify-center"
+            >
+              <div className="inline-flex items-center gap-2 py-1.5 px-3 rounded-full border border-amber-500/30 bg-gradient-to-r from-amber-950/70 via-amber-900/50 to-amber-950/70 backdrop-blur-md shadow-lg shadow-amber-500/10">
+                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold tracking-[0.15em] text-amber-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  LIVE
+                </span>
+                <span className="text-[11px] font-medium text-white/95 max-w-[70vw] truncate">
+                  {banner.label}
+                </span>
+              </div>
+            </motion.div>
+          )}
+
           <Link
             href="/auth?redirect=/booking"
             className="btn-primary w-full py-4 text-base gap-2 glow-warm-strong"
@@ -134,9 +163,16 @@ export default function SplashPage() {
 
           <Link
             href="/my"
-            className="block text-center text-xs text-stone-400 hover:text-amber-500 transition-colors py-2"
+            className="group flex items-center gap-3 py-3 px-4 rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur-md hover:border-amber-500/40 hover:bg-amber-950/20 transition-all"
           >
-            이미 이용 중이신가요? 내 예약 조회 →
+            <div className="w-9 h-9 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0 group-hover:bg-amber-500/25 transition-colors">
+              <Ticket className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="flex-1 text-left leading-tight">
+              <div className="text-[10px] text-stone-500 uppercase tracking-[0.15em]">Membership</div>
+              <div className="text-sm font-semibold text-white">내 예약 조회</div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
           </Link>
         </div>
       </motion.div>
