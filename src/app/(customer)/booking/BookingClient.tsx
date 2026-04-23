@@ -383,8 +383,8 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
 
           <div className="glass rounded-2xl overflow-hidden">
             {/* Header row */}
-            <div className="grid grid-cols-[44px_1fr_1fr_1fr] bg-white/[0.03] border-b border-white/5">
-              <div className="px-1.5 py-2 text-[9px] uppercase tracking-wider text-stone-500 font-medium">기간</div>
+            <div className="grid grid-cols-[56px_1fr_1fr_1fr] bg-white/[0.03] border-b border-white/5">
+              <div className="px-1.5 py-2 text-[9px] uppercase tracking-wider text-stone-500 font-medium text-center">기간</div>
               {(['M', 'L', 'XL'] as CabinetSize[]).map(size => (
                 <div key={size} className="px-1.5 py-2 text-center border-l border-white/5">
                   <div className="text-[10px] text-stone-400 font-semibold">
@@ -398,9 +398,9 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
             {[1, 3, 6, 12].map(m => (
               <div
                 key={m}
-                className="grid grid-cols-[44px_1fr_1fr_1fr] border-b border-white/5 last:border-b-0"
+                className="grid grid-cols-[56px_1fr_1fr_1fr] border-b border-white/5 last:border-b-0"
               >
-                <div className="px-1.5 py-2.5 flex items-center text-[11px] font-semibold text-white">
+                <div className="px-1.5 py-2.5 flex items-center justify-center text-[11px] font-semibold text-white whitespace-nowrap">
                   {m}개월
                 </div>
                 {(['M', 'L', 'XL'] as CabinetSize[]).map(size => {
@@ -408,32 +408,52 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
                   const rule = promo ? toPromotionRule(promo) : null;
                   const p = calculatePrice({ cabinetSize: size, months: m, promotion: rule });
                   const discountPct = Math.round(p.discountRate * 100);
+                  const segments = buildRentalSegments(size, m, rule);
+                  const showBreakdown = m >= 3 && segments.length >= 2;
                   return (
                     <div
                       key={size}
-                      className={`px-2 py-3 border-l border-white/5 ${promo ? 'bg-amber-500/[0.05]' : ''}`}
+                      className={`px-2 py-3 border-l border-white/5 text-center ${promo ? 'bg-amber-500/[0.05]' : ''}`}
                     >
                       <div className="text-[13px] font-bold text-white tabular-nums leading-tight">
                         ₩{p.totalRental.toLocaleString()}
                       </div>
-                      <div className="text-[10px] leading-tight mt-1 tabular-nums">
-                        {discountPct > 0 ? (
-                          <span className="text-amber-400/90 font-medium">{discountPct}% 할인</span>
-                        ) : (
-                          <span className="text-stone-500">월 ₩{p.monthlyPrice.toLocaleString()}</span>
-                        )}
-                      </div>
+                      {showBreakdown ? (
+                        <div className="mt-1 space-y-0.5">
+                          {segments.map((seg, idx) => {
+                            const segPct = Math.round(seg.rate * 100);
+                            const rateText = seg.free ? '무료' : segPct > 0 ? `${segPct}%` : '';
+                            const colorCls = seg.free
+                              ? 'text-green-400'
+                              : segPct > 0
+                                ? 'text-amber-400/90 font-medium'
+                                : 'text-stone-400';
+                            return (
+                              <div key={`${seg.start}-${seg.end}`} className={`text-[10px] leading-tight tabular-nums ${colorCls}`}>
+                                {idx > 0 && '+ '}
+                                {segmentLabel(seg.start, seg.end)}
+                                {rateText && ` ${rateText}`}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-[10px] leading-tight mt-1 tabular-nums">
+                          {discountPct > 0 ? (
+                            <span className="text-amber-400/90 font-medium">{discountPct}% 할인</span>
+                          ) : (
+                            <span className="text-stone-500">월 ₩{p.monthlyPrice.toLocaleString()}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
             ))}
 
-            <div className="px-3 py-2.5 text-[10px] text-stone-500 text-center bg-white/[0.02] border-t border-white/5 space-y-0.5">
-              <div>* 모든 금액은 보증금 별도</div>
-              {activePromos.length > 0 && (
-                <div className="text-amber-500/80">* 음영 셀은 프로모션 적용</div>
-              )}
+            <div className="px-3 py-2.5 text-[10px] text-stone-500 bg-white/[0.02] border-t border-white/5 text-right">
+              * 모든 금액은 보증금 별도
             </div>
           </div>
         </div>
@@ -641,6 +661,8 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
                 <div className="space-y-1.5">
                   {buildRentalSegments(selectedSize, months, step3Rule).map(seg => {
                     const pct = Math.round(seg.rate * 100);
+                    const segLength = seg.end - seg.start + 1;
+                    const segTotal = seg.monthlyAmount * segLength;
                     return (
                       <div key={`${seg.start}-${seg.end}`} className="flex justify-between items-center text-xs">
                         <span className="flex items-center gap-2 min-w-0">
@@ -652,7 +674,9 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
                           ) : null}
                         </span>
                         <span className={`tabular-nums shrink-0 ${seg.free ? 'text-green-400' : 'text-stone-200'}`}>
-                          월 ₩{seg.monthlyAmount.toLocaleString()}
+                          {segLength === 1
+                            ? `월 ₩${seg.monthlyAmount.toLocaleString()}`
+                            : `₩${segTotal.toLocaleString()}`}
                         </span>
                       </div>
                     );
@@ -1063,9 +1087,11 @@ function buildRentalSegments(size: CabinetSize, months: number, rule: PromotionR
 }
 
 function segmentLabel(start: number, end: number): string {
-  if (start === end) return start === 1 ? '첫달' : `${start}개월차`;
-  if (start === 1) return `첫 ${end}개월`;
-  return `${start}~${end}개월차`;
+  const length = end - start + 1;
+  if (start === 1 && length === 1) return '첫달';
+  if (start === 1) return `첫 ${length}개월`;
+  if (length === 1) return `${start}개월차`;
+  return `${length}개월`;
 }
 
 function formatMonthSpan(months: number[]): string {
