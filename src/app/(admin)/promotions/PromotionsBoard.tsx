@@ -8,6 +8,8 @@ import { PromotionForm, type PromotionFormValues, type PromotionType, type Sched
 interface Row {
   id: string;
   name: string;
+  bannerLabel: string | null;
+  badgeLabel: string | null;
   type: PromotionType;
   isActive: boolean;
   priority: number;
@@ -103,6 +105,8 @@ export function PromotionsBoard({ rows }: { rows: Row[] }) {
   const toFormValues = (r: Row): PromotionFormValues => ({
     id: r.id,
     name: r.name,
+    bannerLabel: r.bannerLabel,
+    badgeLabel: r.badgeLabel,
     type: r.type,
     isActive: r.isActive,
     priority: r.priority,

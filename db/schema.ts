@@ -240,6 +240,9 @@ export const alimtalkLogs = pgTable('alimtalk_logs', {
 export const promotions = pgTable('promotions', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 100 }).notNull(),
+  // 고객 노출용 — 비우면 name / 자동생성 뱃지를 사용
+  bannerLabel: varchar('banner_label', { length: 100 }),  // Step 1 상단 배너 문구 (예: "봄맞이 특별 할인")
+  badgeLabel: varchar('badge_label', { length: 50 }),     // 사이즈 카드 뱃지 문구 (예: "첫 달 반값")
   type: promotionTypeEnum('type').notNull(),
   isActive: boolean('is_active').default(false).notNull(),
   priority: integer('priority').default(0).notNull(), // 높을수록 우선

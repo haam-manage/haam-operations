@@ -35,6 +35,22 @@ export async function PATCH(
     if (!n || n.length > 100) errors.push('name 1~100자');
     else patch.name = n;
   }
+  if (body.bannerLabel !== undefined) {
+    if (body.bannerLabel === null || body.bannerLabel === '') patch.bannerLabel = null;
+    else if (typeof body.bannerLabel === 'string') {
+      const s = body.bannerLabel.trim();
+      if (s.length > 100) errors.push('bannerLabel 100자 이내');
+      else patch.bannerLabel = s || null;
+    } else errors.push('bannerLabel 문자열 또는 null');
+  }
+  if (body.badgeLabel !== undefined) {
+    if (body.badgeLabel === null || body.badgeLabel === '') patch.badgeLabel = null;
+    else if (typeof body.badgeLabel === 'string') {
+      const s = body.badgeLabel.trim();
+      if (s.length > 50) errors.push('badgeLabel 50자 이내');
+      else patch.badgeLabel = s || null;
+    } else errors.push('badgeLabel 문자열 또는 null');
+  }
   if (typeof body.isActive === 'boolean') patch.isActive = body.isActive;
   if (typeof body.isNewOnly === 'boolean') patch.isNewOnly = body.isNewOnly;
   if (Number.isFinite(Number(body.priority))) patch.priority = Number(body.priority);

@@ -15,6 +15,8 @@ type Step = 1 | 2 | 3 | 4 | 5 | 6;
 interface ActivePromotion {
   id: string;
   name: string;
+  bannerLabel: string | null;
+  badgeLabel: string | null;
   type: PromotionType;
   priority: number;
   applicableSizes: CabinetSize[] | null;
@@ -43,24 +45,26 @@ function getBestDiscountForSize(size: CabinetSize, promos: ActivePromotion[]): S
   for (const p of promos) {
     if (p.applicableSizes && !p.applicableSizes.includes(size)) continue;
 
+    // 관리자가 badgeLabel 을 채웠으면 자동 생성 대신 그 문구를 사용
+    const override = p.badgeLabel?.trim() || null;
     const candidates: { rate: number; badge: string }[] = [];
 
     if (p.type === 'discount_rate') {
       const r = Number(p.discountRate);
       if (Number.isFinite(r) && r > 0) {
-        candidates.push({ rate: r, badge: `전 기간 ${Math.round(r * 100)}%` });
+        candidates.push({ rate: r, badge: override ?? `전 기간 ${Math.round(r * 100)}%` });
       }
     } else if (p.type === 'per_month_schedule' && Array.isArray(p.monthlySchedule)) {
       for (const e of p.monthlySchedule) {
         if (Number.isFinite(e.rate) && e.rate > 0 && Array.isArray(e.months) && e.months.length > 0) {
-          candidates.push({ rate: e.rate, badge: formatScheduleBadge(e.months, e.rate) });
+          candidates.push({ rate: e.rate, badge: override ?? formatScheduleBadge(e.months, e.rate) });
         }
       }
     } else if (p.type === 'free_months' && p.freeMonths && p.freeMonths > 0) {
       const spans = p.applicableMonths && p.applicableMonths.length > 0 ? p.applicableMonths : [12];
       const m = Math.max(...spans);
       if (m > 0 && p.freeMonths < m) {
-        candidates.push({ rate: p.freeMonths / m, badge: `${m}개월 약정 시 ${p.freeMonths}달 무료` });
+        candidates.push({ rate: p.freeMonths / m, badge: override ?? `${m}개월 약정 시 ${p.freeMonths}달 무료` });
       }
     }
 
@@ -230,7 +234,11 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
 
   // ─── Step 1: Size Selection ───
   if (step === 1) {
+    // 배너 라벨 우선순위: 여러 프로모션에 같은 bannerLabel 있으면 묶어서 하나로 표시
     const heroPromo = activePromos[0] ?? null;
+    const heroBannerLabel = heroPromo
+      ? (activePromos.map(p => p.bannerLabel?.trim()).find(Boolean) ?? heroPromo.name)
+      : null;
 
     return (
       <StepLayout
@@ -269,7 +277,7 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
                   </span>
                 </div>
                 <div className="text-sm font-bold text-white truncate">
-                  {heroPromo.name}
+                  {heroBannerLabel}
                 </div>
               </div>
             </div>

@@ -33,6 +33,8 @@ export default async function PromotionsPage() {
   const boardRows = rows.map(r => ({
     id: r.id,
     name: r.name,
+    bannerLabel: r.bannerLabel,
+    badgeLabel: r.badgeLabel,
     type: r.type,
     isActive: r.isActive,
     priority: r.priority,
