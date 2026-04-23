@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { Check, CreditCard, Lock, ChevronRight, Package, Calendar, Mail, Minus, Plus, ShieldCheck } from 'lucide-react';
+import { Check, CreditCard, Lock, ChevronRight, Package, Calendar, Mail, Minus, Plus, ShieldCheck, Gift, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
 import { StepLayout } from '../../../components/StepLayout';
@@ -23,6 +23,70 @@ interface ActivePromotion {
   freeMonths: number | null;
   discountAmount: number | null;
   monthlySchedule: { months: number[]; rate: number }[] | null;
+}
+
+interface SizeDiscountPreview {
+  maxRate: number;
+  badge: string;
+  promoName: string;
+}
+
+/**
+ * 사이즈별 "최대 할인율" 과 대표 뱃지 텍스트를 뽑는다.
+ * - 같은 사이즈에 적용 가능한 모든 활성 프로모션을 훑고
+ * - 월 기준 최대 할인율(%)을 기록
+ * - 해당 할인율을 만드는 구간을 뱃지에 반영 (예: "첫 1개월 50%")
+ */
+function getBestDiscountForSize(size: CabinetSize, promos: ActivePromotion[]): SizeDiscountPreview | null {
+  let best: { rate: number; badge: string; promoName: string } | null = null;
+
+  for (const p of promos) {
+    if (p.applicableSizes && !p.applicableSizes.includes(size)) continue;
+
+    const candidates: { rate: number; badge: string }[] = [];
+
+    if (p.type === 'discount_rate') {
+      const r = Number(p.discountRate);
+      if (Number.isFinite(r) && r > 0) {
+        candidates.push({ rate: r, badge: `전 기간 ${Math.round(r * 100)}%` });
+      }
+    } else if (p.type === 'per_month_schedule' && Array.isArray(p.monthlySchedule)) {
+      for (const e of p.monthlySchedule) {
+        if (Number.isFinite(e.rate) && e.rate > 0 && Array.isArray(e.months) && e.months.length > 0) {
+          candidates.push({ rate: e.rate, badge: formatScheduleBadge(e.months, e.rate) });
+        }
+      }
+    } else if (p.type === 'free_months' && p.freeMonths && p.freeMonths > 0) {
+      const spans = p.applicableMonths && p.applicableMonths.length > 0 ? p.applicableMonths : [12];
+      const m = Math.max(...spans);
+      if (m > 0 && p.freeMonths < m) {
+        candidates.push({ rate: p.freeMonths / m, badge: `${m}개월 약정 시 ${p.freeMonths}달 무료` });
+      }
+    }
+
+    for (const c of candidates) {
+      if (!best || c.rate > best.rate) {
+        best = { rate: c.rate, badge: c.badge, promoName: p.name };
+      }
+    }
+  }
+
+  return best ? { maxRate: best.rate, badge: best.badge, promoName: best.promoName } : null;
+}
+
+function formatScheduleBadge(months: number[], rate: number): string {
+  const sorted = [...months].sort((a, b) => a - b);
+  const pct = Math.round(rate * 100);
+  const groups: string[] = [];
+  let s = sorted[0];
+  let e = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === e + 1) { e = sorted[i]; continue; }
+    groups.push(s === e ? `${s}` : `${s}~${e}`);
+    s = sorted[i]; e = sorted[i];
+  }
+  groups.push(s === e ? `${s}` : `${s}~${e}`);
+  return `${groups.join(',')}개월 ${pct}%`;
 }
 
 function findRuleFor(size: CabinetSize, months: number, promos: ActivePromotion[]): PromotionRule | null {
@@ -166,6 +230,8 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
 
   // ─── Step 1: Size Selection ───
   if (step === 1) {
+    const heroPromo = activePromos[0] ?? null;
+
     return (
       <StepLayout
         step={1} totalSteps={6}
@@ -183,10 +249,40 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
           </Button>
         }
       >
+        {/* Promo Hero Banner — 최신 트렌드: glassmorphism + gradient halo + live chip */}
+        {heroPromo && (
+          <div className="mb-5 relative overflow-hidden rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-950/60 via-stone-950/80 to-orange-950/40 p-4 animate-fade-in">
+            <div className="pointer-events-none absolute -right-10 -top-10 w-40 h-40 rounded-full bg-amber-500/20 blur-3xl" />
+            <div className="pointer-events-none absolute -left-10 -bottom-10 w-32 h-32 rounded-full bg-orange-500/15 blur-3xl" />
+            <div className="relative flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/40 shrink-0">
+                <Gift className="w-5 h-5 text-black" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="relative inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500 text-black text-[8px] font-extrabold tracking-wider">
+                    <span className="w-1 h-1 rounded-full bg-red-600 animate-pulse" />
+                    LIVE
+                  </span>
+                  <span className="text-[10px] uppercase tracking-[0.15em] text-amber-400/80">
+                    진행중인 혜택
+                  </span>
+                </div>
+                <div className="text-sm font-bold text-white truncate">
+                  {heroPromo.name}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-3">
           {(['M', 'L', 'XL'] as CabinetSize[]).map(size => {
             const info = SIZE_INFO[size];
             const selected = selectedSize === size;
+            const discount = getBestDiscountForSize(size, activePromos);
+            const discountedPrice = discount ? Math.round(info.price * (1 - discount.maxRate)) : null;
+
             return (
               <button
                 key={size}
@@ -197,6 +293,11 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
               >
                 <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 relative">
                   <Image src={info.image} alt={size} fill className="object-cover" />
+                  {discount && (
+                    <div className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-md bg-gradient-to-br from-rose-500 to-red-600 text-white text-[9px] font-extrabold shadow-lg shadow-red-500/40">
+                      -{Math.round(discount.maxRate * 100)}%
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -204,7 +305,27 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
                     <span className="text-xs text-stone-600">{size}</span>
                   </div>
                   <p className="text-[11px] text-stone-500 mb-1">{info.desc}</p>
-                  <p className="text-sm font-semibold text-white">월 ₩{info.price.toLocaleString()}</p>
+
+                  {discount && discountedPrice !== null ? (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-[11px] text-stone-600 line-through tabular-nums">
+                        ₩{info.price.toLocaleString()}
+                      </span>
+                      <span className="text-base font-bold gradient-text-warm tabular-nums">
+                        ₩{discountedPrice.toLocaleString()}
+                      </span>
+                      <span className="text-[10px] text-amber-500/80">/월부터</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm font-semibold text-white tabular-nums">월 ₩{info.price.toLocaleString()}</p>
+                  )}
+
+                  {discount && (
+                    <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/10 border border-amber-500/30 text-[10px] font-medium text-amber-300">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      {discount.badge}
+                    </div>
+                  )}
                 </div>
                 {selected && (
                   <div className="w-7 h-7 rounded-full bg-amber-700 flex items-center justify-center shrink-0">
