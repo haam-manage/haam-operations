@@ -16,7 +16,6 @@ export async function GET() {
     .select({
       id: promotions.id,
       name: promotions.name,
-      bannerLabel: promotions.bannerLabel,
       badgeLabel: promotions.badgeLabel,
       type: promotions.type,
       priority: promotions.priority,

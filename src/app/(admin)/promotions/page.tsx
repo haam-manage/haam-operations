@@ -7,7 +7,11 @@ import {
   toPromotionRule,
 } from '../../../../lib/promotions';
 import { calculatePrice, type CabinetSize } from '../../../../lib/price';
+import { db } from '../../../../db';
+import { banners } from '../../../../db/schema';
+import { desc } from 'drizzle-orm';
 import { PromotionsBoard } from './PromotionsBoard';
+import { BannersBoard } from './BannersBoard';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +20,10 @@ const MONTHS = [1, 3, 6, 12];
 const SIZE_LABEL: Record<CabinetSize, string> = { M: '소중:함', L: '든든:함', XL: '넉넉:함' };
 
 export default async function PromotionsPage() {
-  const rows = await listPromotions();
+  const [rows, bannerRows] = await Promise.all([
+    listPromotions(),
+    db.select().from(banners).orderBy(desc(banners.priority), desc(banners.createdAt)),
+  ]);
 
   // 프리뷰: 각 (size, month) 조합에 대해 실제 적용될 가격 계산
   const preview = await Promise.all(
@@ -33,7 +40,6 @@ export default async function PromotionsPage() {
   const boardRows = rows.map(r => ({
     id: r.id,
     name: r.name,
-    bannerLabel: r.bannerLabel,
     badgeLabel: r.badgeLabel,
     type: r.type,
     isActive: r.isActive,
@@ -67,6 +73,17 @@ export default async function PromotionsPage() {
       </header>
 
       <div className="max-w-3xl mx-auto px-5 py-6 space-y-5">
+        <BannersBoard
+          rows={bannerRows.map(b => ({
+            id: b.id,
+            label: b.label,
+            isActive: b.isActive,
+            priority: b.priority,
+            startsAt: b.startsAt ? b.startsAt.toISOString() : null,
+            endsAt: b.endsAt ? b.endsAt.toISOString() : null,
+          }))}
+        />
+
         <PromotionsBoard rows={boardRows} />
 
         {/* Pricing preview — 실제 적용 결과 */}

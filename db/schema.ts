@@ -240,9 +240,9 @@ export const alimtalkLogs = pgTable('alimtalk_logs', {
 export const promotions = pgTable('promotions', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 100 }).notNull(),
-  // 고객 노출용 — 비우면 name / 자동생성 뱃지를 사용
-  bannerLabel: varchar('banner_label', { length: 100 }),  // Step 1 상단 배너 문구 (예: "봄맞이 특별 할인")
-  badgeLabel: varchar('badge_label', { length: 50 }),     // 사이즈 카드 뱃지 문구 (예: "첫 달 반값")
+  // 고객 사이즈 카드 뱃지 문구 (예: "첫 달 반값"). 비우면 자동 생성.
+  // Step 1 상단 배너는 별도 banners 테이블에서 관리 — 프로모션과 독립된 시즌 메시지.
+  badgeLabel: varchar('badge_label', { length: 50 }),
   type: promotionTypeEnum('type').notNull(),
   isActive: boolean('is_active').default(false).notNull(),
   priority: integer('priority').default(0).notNull(), // 높을수록 우선
@@ -257,6 +257,23 @@ export const promotions = pgTable('promotions', {
   // per_month_schedule 전용 — [{ months: [1], rate: 0.5 }, { months: [2,3], rate: 0.2 }]
   monthlySchedule: jsonb('monthly_schedule'),
   // 유효 기간
+  startsAt: timestamp('starts_at', { withTimezone: true }),
+  endsAt: timestamp('ends_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ─────────────────────────────────────────
+// 10-b. banners — 시즌·캠페인 배너 (Step 1 상단 문구)
+// ─────────────────────────────────────────
+// 프로모션과 독립. 한 시즌에 여러 프로모션이 걸려도 배너는 하나의 문구로 통일됨.
+// 활성 배너 중 priority 최상위 1개가 노출. 없으면 배너 영역 숨김.
+
+export const banners = pgTable('banners', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  label: varchar('label', { length: 100 }).notNull(),     // 고객 노출 문구 (예: "봄맞이 특별 할인")
+  isActive: boolean('is_active').default(true).notNull(),
+  priority: integer('priority').default(0).notNull(),      // 높을수록 우선
   startsAt: timestamp('starts_at', { withTimezone: true }),
   endsAt: timestamp('ends_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

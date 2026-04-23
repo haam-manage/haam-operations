@@ -14,10 +14,6 @@ function parseBody(body: any) {
   if (!name) errors.push('name 필수');
   if (name.length > 100) errors.push('name 100자 이내');
 
-  const bannerLabelRaw = typeof body?.bannerLabel === 'string' ? body.bannerLabel.trim() : '';
-  if (bannerLabelRaw.length > 100) errors.push('bannerLabel 100자 이내');
-  const bannerLabel = bannerLabelRaw || null;
-
   const badgeLabelRaw = typeof body?.badgeLabel === 'string' ? body.badgeLabel.trim() : '';
   if (badgeLabelRaw.length > 50) errors.push('badgeLabel 50자 이내');
   const badgeLabel = badgeLabelRaw || null;
@@ -72,7 +68,7 @@ function parseBody(body: any) {
   return {
     errors,
     values: {
-      name, bannerLabel, badgeLabel, type, isActive, priority, isNewOnly,
+      name, badgeLabel, type, isActive, priority, isNewOnly,
       applicableSizes, applicableMonths,
       discountRate, freeMonths, discountAmount, monthlySchedule,
       startsAt, endsAt,

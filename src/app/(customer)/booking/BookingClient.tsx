@@ -15,7 +15,6 @@ type Step = 1 | 2 | 3 | 4 | 5 | 6;
 interface ActivePromotion {
   id: string;
   name: string;
-  bannerLabel: string | null;
   badgeLabel: string | null;
   type: PromotionType;
   priority: number;
@@ -152,6 +151,7 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
   const [orderResult, setOrderResult] = useState<{ orderId: string; orderName: string } | null>(null);
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
   const [activePromos, setActivePromos] = useState<ActivePromotion[]>([]);
+  const [activeBanner, setActiveBanner] = useState<{ id: string; label: string } | null>(null);
   const widgetsRef = useRef<TossPaymentsWidgets | null>(null);
 
   useEffect(() => {
@@ -174,6 +174,15 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
       .then(data => {
         if (!data?.promotions) return;
         setActivePromos(data.promotions as ActivePromotion[]);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/banner/active')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.banner) setActiveBanner(data.banner as { id: string; label: string });
       })
       .catch(() => {});
   }, []);
@@ -234,12 +243,7 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
 
   // ─── Step 1: Size Selection ───
   if (step === 1) {
-    // 배너 라벨 우선순위: 여러 프로모션에 같은 bannerLabel 있으면 묶어서 하나로 표시
-    const heroPromo = activePromos[0] ?? null;
-    const heroBannerLabel = heroPromo
-      ? (activePromos.map(p => p.bannerLabel?.trim()).find(Boolean) ?? heroPromo.name)
-      : null;
-
+    // 배너는 banners 테이블의 활성 1건을 그대로 노출. 프로모션과 독립.
     return (
       <StepLayout
         step={1} totalSteps={6}
@@ -257,8 +261,8 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
           </Button>
         }
       >
-        {/* Promo Hero Banner — 최신 트렌드: glassmorphism + gradient halo + live chip */}
-        {heroPromo && (
+        {/* Promo Hero Banner — banners 테이블에서 온 시즌 메시지 1건 */}
+        {activeBanner && (
           <div className="mb-5 relative overflow-hidden rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-950/60 via-stone-950/80 to-orange-950/40 p-4 animate-fade-in">
             <div className="pointer-events-none absolute -right-10 -top-10 w-40 h-40 rounded-full bg-amber-500/20 blur-3xl" />
             <div className="pointer-events-none absolute -left-10 -bottom-10 w-32 h-32 rounded-full bg-orange-500/15 blur-3xl" />
@@ -277,7 +281,7 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
                   </span>
                 </div>
                 <div className="text-sm font-bold text-white truncate">
-                  {heroBannerLabel}
+                  {activeBanner.label}
                 </div>
               </div>
             </div>

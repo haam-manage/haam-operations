@@ -14,7 +14,6 @@ export interface ScheduleEntry {
 export interface PromotionFormValues {
   id?: string;
   name: string;
-  bannerLabel: string | null;
   badgeLabel: string | null;
   type: PromotionType;
   isActive: boolean;
@@ -32,7 +31,6 @@ export interface PromotionFormValues {
 
 const EMPTY: PromotionFormValues = {
   name: '',
-  bannerLabel: null,
   badgeLabel: null,
   type: 'discount_rate',
   isActive: false,
@@ -66,7 +64,6 @@ export function PromotionForm({
 
     const payload: Record<string, unknown> = {
       name: v.name.trim(),
-      bannerLabel: v.bannerLabel?.trim() || null,
       badgeLabel: v.badgeLabel?.trim() || null,
       type: v.type,
       isActive: v.isActive,
@@ -148,27 +145,15 @@ export function PromotionForm({
         />
       </Field>
 
-      <div className="rounded-xl bg-amber-950/15 border border-amber-600/15 p-3 space-y-3">
-        <p className="text-[10px] text-amber-400/70 uppercase tracking-wider">고객 노출 문구 (선택)</p>
-        <Field label="배너 문구 — Step 1 상단 배너 (비우면 '이름' 사용)">
-          <input
-            value={v.bannerLabel ?? ''}
-            onChange={e => setV({ ...v, bannerLabel: e.target.value || null })}
-            placeholder="예: 봄맞이 특별 할인"
-            maxLength={100}
-            className="input-dark w-full px-3 py-2 text-sm"
-          />
-        </Field>
-        <Field label="뱃지 문구 — 사이즈 카드 (비우면 자동: '1개월 50%' 등)">
-          <input
-            value={v.badgeLabel ?? ''}
-            onChange={e => setV({ ...v, badgeLabel: e.target.value || null })}
-            placeholder="예: 첫 달 반값"
-            maxLength={50}
-            className="input-dark w-full px-3 py-2 text-sm"
-          />
-        </Field>
-      </div>
+      <Field label="뱃지 문구 — 사이즈 카드 (선택, 비우면 자동: '1개월 50%' 등)">
+        <input
+          value={v.badgeLabel ?? ''}
+          onChange={e => setV({ ...v, badgeLabel: e.target.value || null })}
+          placeholder="예: 첫 달 반값"
+          maxLength={50}
+          className="input-dark w-full px-3 py-2 text-sm"
+        />
+      </Field>
 
       <Field label="유형">
         <select value={v.type} onChange={e => setV({ ...v, type: e.target.value as PromotionType })} className="input-dark w-full px-3 py-2 text-sm">
