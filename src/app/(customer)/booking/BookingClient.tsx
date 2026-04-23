@@ -674,9 +674,7 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
                           ) : null}
                         </span>
                         <span className={`tabular-nums shrink-0 ${seg.free ? 'text-green-400' : 'text-stone-200'}`}>
-                          {segLength === 1
-                            ? `월 ₩${seg.monthlyAmount.toLocaleString()}`
-                            : `₩${segTotal.toLocaleString()}`}
+                          ₩{segTotal.toLocaleString()}
                         </span>
                       </div>
                     );
@@ -1090,7 +1088,6 @@ function segmentLabel(start: number, end: number): string {
   const length = end - start + 1;
   if (start === 1 && length === 1) return '첫달';
   if (start === 1) return `첫 ${length}개월`;
-  if (length === 1) return `${start}개월차`;
   return `${length}개월`;
 }
 
