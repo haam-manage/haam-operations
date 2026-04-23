@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit2, Loader2, Power, Calendar, Tag, Percent, Gift as GiftIcon, Banknote, LayoutList } from 'lucide-react';
+import { Plus, Edit2, Loader2, Power, Calendar, Tag, Percent, Gift as GiftIcon, Banknote, LayoutList, Trash2 } from 'lucide-react';
 import { PromotionForm, type PromotionFormValues, type PromotionType, type ScheduleEntry } from './PromotionForm';
 
 interface Row {
@@ -41,7 +41,51 @@ export function PromotionsBoard({ rows }: { rows: Row[] }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  const allIds = useMemo(() => rows.map(r => r.id), [rows]);
+  const allSelected = allIds.length > 0 && allIds.every(id => selected.has(id));
+  const someSelected = selected.size > 0;
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(allIds));
+  };
+
+  const bulkDelete = () => {
+    if (selected.size === 0) return;
+    const names = rows.filter(r => selected.has(r.id)).map(r => `• ${r.name}`).join('\n');
+    if (!window.confirm(`선택한 ${selected.size}개 프로모션을 삭제하시겠습니까?\n\n${names}\n\n되돌릴 수 없습니다.`)) return;
+    setBulkDeleting(true);
+    startTransition(async () => {
+      const ids = Array.from(selected);
+      const results = await Promise.all(
+        ids.map(id =>
+          fetch(`/api/admin/promotions/${id}`, { method: 'DELETE' })
+            .then(res => ({ id, ok: res.ok }))
+            .catch(() => ({ id, ok: false })),
+        ),
+      );
+      setBulkDeleting(false);
+      const failed = results.filter(r => !r.ok);
+      if (failed.length > 0) {
+        alert(`${failed.length}개 삭제 실패. 다시 시도해주세요.`);
+      }
+      setSelected(new Set(failed.map(f => f.id)));
+      router.refresh();
+    });
+  };
 
   const toggle = (row: Row) => {
     setTogglingId(row.id);
@@ -89,6 +133,32 @@ export function PromotionsBoard({ rows }: { rows: Row[] }) {
         </button>
       )}
 
+      {/* Bulk toolbar */}
+      {rows.length > 0 && (
+        <div className="flex items-center justify-between gap-3 px-1">
+          <label className="inline-flex items-center gap-2 text-xs text-stone-400 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleSelectAll}
+              className="accent-amber-600 w-4 h-4"
+            />
+            전체 선택 {someSelected && <span className="text-amber-400">({selected.size})</span>}
+          </label>
+          {someSelected && (
+            <button
+              type="button"
+              onClick={bulkDelete}
+              disabled={isPending || bulkDeleting}
+              className="touch-target inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+            >
+              {bulkDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              선택한 {selected.size}개 삭제
+            </button>
+          )}
+        </div>
+      )}
+
       {/* List */}
       {rows.length === 0 ? (
         <div className="glass p-8 text-center">
@@ -101,7 +171,15 @@ export function PromotionsBoard({ rows }: { rows: Row[] }) {
               <PromotionForm initial={toFormValues(row)} onCancel={() => setEditing(null)} />
             ) : (
               <div className={`${row.isActive ? 'glass-warm glow-warm' : 'glass'} p-4`}>
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(row.id)}
+                    onChange={() => toggleSelect(row.id)}
+                    className="accent-amber-600 w-4 h-4 mt-1 cursor-pointer flex-shrink-0"
+                    aria-label={`${row.name} 선택`}
+                  />
+                  <div className="flex-1 min-w-0 flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       <span className={`badge text-[9px] ${row.isActive ? 'badge-green' : 'badge-warm'}`}>
@@ -162,6 +240,7 @@ export function PromotionsBoard({ rows }: { rows: Row[] }) {
                       <Edit2 className="w-3.5 h-3.5" />
                       수정
                     </button>
+                  </div>
                   </div>
                 </div>
               </div>

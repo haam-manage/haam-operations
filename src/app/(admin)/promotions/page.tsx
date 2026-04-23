@@ -2,7 +2,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Gift } from 'lucide-react';
 import {
-  ensureOpeningPromotionSeeds,
   findApplicablePromotion,
   listPromotions,
   toPromotionRule,
@@ -17,7 +16,6 @@ const MONTHS = [1, 3, 6, 12];
 const SIZE_LABEL: Record<CabinetSize, string> = { M: '소중:함', L: '든든:함', XL: '넉넉:함' };
 
 export default async function PromotionsPage() {
-  await ensureOpeningPromotionSeeds();
   const rows = await listPromotions();
 
   // 프리뷰: 각 (size, month) 조합에 대해 실제 적용될 가격 계산

@@ -3,8 +3,6 @@ import { promotions } from '../db/schema';
 import { and, desc, eq, gte, lte, or, isNull, sql } from 'drizzle-orm';
 import type { PromotionRule, CabinetSize } from './price';
 
-export const OPENING_PROMO_PREFIX = '오픈기념';
-
 export type Promotion = typeof promotions.$inferSelect;
 
 /**
@@ -70,59 +68,6 @@ export function toPromotionRule(p: Promotion | null): PromotionRule | null {
     discountAmount: p.discountAmount,
     monthlySchedule: (p.monthlySchedule as { months: number[]; rate: number }[] | null) ?? null,
   };
-}
-
-/**
- * "오픈기념 프로모션" 기본 4종 시드 보장.
- * 이미 오픈기념 prefix 로 행이 있으면 스킵 (중복 삽입 방지).
- * 모두 비활성 상태로 생성 → 관리자가 필요 시 수동 활성화.
- */
-export async function ensureOpeningPromotionSeeds() {
-  const existing = await db
-    .select({ id: promotions.id })
-    .from(promotions)
-    .where(sql`${promotions.name} LIKE ${OPENING_PROMO_PREFIX + '%'}`)
-    .limit(1);
-  if (existing.length > 0) return;
-
-  await db.insert(promotions).values([
-    {
-      name: '오픈기념 1개월 15% 할인',
-      type: 'discount_rate',
-      isActive: false,
-      priority: 100,
-      applicableMonths: [1],
-      discountRate: '0.15',
-      isNewOnly: false,
-    },
-    {
-      name: '오픈기념 3개월 1달 무료',
-      type: 'free_months',
-      isActive: false,
-      priority: 100,
-      applicableMonths: [3],
-      freeMonths: 1,
-      isNewOnly: false,
-    },
-    {
-      name: '오픈기념 6개월 2달 무료',
-      type: 'free_months',
-      isActive: false,
-      priority: 100,
-      applicableMonths: [6],
-      freeMonths: 2,
-      isNewOnly: false,
-    },
-    {
-      name: '오픈기념 12개월 4달 무료',
-      type: 'free_months',
-      isActive: false,
-      priority: 100,
-      applicableMonths: [12],
-      freeMonths: 4,
-      isNewOnly: false,
-    },
-  ]);
 }
 
 /** 관리자 UI 에서 사용할 전체 목록 */
