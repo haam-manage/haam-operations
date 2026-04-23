@@ -407,31 +407,33 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
                   const promo = findPromoFor(size, m, activePromos);
                   const rule = promo ? toPromotionRule(promo) : null;
                   const p = calculatePrice({ cabinetSize: size, months: m, promotion: rule });
-                  const breakdown = describePromotionPlan(rule, m, promo?.planLabel);
                   const discountPct = Math.round(p.discountRate * 100);
                   return (
-                    <div key={size} className="px-1.5 py-2.5 border-l border-white/5">
-                      <div className="text-[12px] font-bold text-white tabular-nums leading-tight">
+                    <div
+                      key={size}
+                      className={`px-2 py-3 border-l border-white/5 ${promo ? 'bg-amber-500/[0.05]' : ''}`}
+                    >
+                      <div className="text-[13px] font-bold text-white tabular-nums leading-tight">
                         ₩{p.totalRental.toLocaleString()}
                       </div>
-                      <div className="text-[9px] text-stone-500 leading-tight mt-0.5 tabular-nums">
-                        월 ₩{p.monthlyPrice.toLocaleString()}
-                        {discountPct > 0 && <> · <span className="text-stone-400">{discountPct}% 할인</span></>}
+                      <div className="text-[10px] leading-tight mt-1 tabular-nums">
+                        {discountPct > 0 ? (
+                          <span className="text-amber-400/90 font-medium">{discountPct}% 할인</span>
+                        ) : (
+                          <span className="text-stone-500">월 ₩{p.monthlyPrice.toLocaleString()}</span>
+                        )}
                       </div>
-                      {breakdown && (
-                        <div className="mt-1 flex items-start gap-0.5 text-[9px] font-medium text-amber-400/90 leading-tight">
-                          <Sparkles className="w-2.5 h-2.5 mt-px shrink-0" />
-                          <span>{breakdown}</span>
-                        </div>
-                      )}
                     </div>
                   );
                 })}
               </div>
             ))}
 
-            <div className="px-3 py-2 text-[10px] text-stone-500 text-center bg-white/[0.02]">
-              * 보증금 별도 · {activePromos.length > 0 ? '프로모션 적용 중' : '장기할인 자동 적용'}
+            <div className="px-3 py-2.5 text-[10px] text-stone-500 text-center bg-white/[0.02] border-t border-white/5 space-y-0.5">
+              <div>* 모든 금액은 보증금 별도</div>
+              {activePromos.length > 0 && (
+                <div className="text-amber-500/80">* 음영 셀은 프로모션 적용</div>
+              )}
             </div>
           </div>
         </div>
@@ -633,24 +635,24 @@ export function BookingClient({ customerId, name, phone, email: initialEmail }: 
                 <span className="text-xl font-bold gradient-text-warm tabular-nums">₩{estimate.totalAmount.toLocaleString()}</span>
               </div>
 
-              {/* 월별 렌탈료 */}
+              {/* 할인 구간별 렌탈료 */}
               <div>
-                <div className="text-[10px] uppercase tracking-[0.15em] text-stone-500 mb-2">월별 렌탈료</div>
-                <div className="space-y-1">
-                  {buildMonthlyRental(selectedSize, months, step3Rule).map(line => {
-                    const pct = Math.round(line.rate * 100);
+                <div className="text-[10px] uppercase tracking-[0.15em] text-stone-500 mb-2">할인 구간</div>
+                <div className="space-y-1.5">
+                  {buildRentalSegments(selectedSize, months, step3Rule).map(seg => {
+                    const pct = Math.round(seg.rate * 100);
                     return (
-                      <div key={line.month} className="flex justify-between items-center text-xs">
-                        <span className="flex items-center gap-2">
-                          <span className="text-stone-400 tabular-nums">렌탈 {line.month}개월차</span>
-                          {line.free ? (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-green-500/15 text-green-300 text-[10px] font-semibold">무료</span>
+                      <div key={`${seg.start}-${seg.end}`} className="flex justify-between items-center text-xs">
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className="text-stone-400 truncate">{segmentLabel(seg.start, seg.end)}</span>
+                          {seg.free ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-green-500/15 text-green-300 text-[10px] font-semibold shrink-0">무료</span>
                           ) : pct > 0 ? (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-300 text-[10px] font-semibold">{pct}% 할인</span>
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-300 text-[10px] font-semibold shrink-0">{pct}% 할인</span>
                           ) : null}
                         </span>
-                        <span className={`tabular-nums ${line.free ? 'text-green-400' : 'text-stone-200'}`}>
-                          ₩{line.amount.toLocaleString()}
+                        <span className={`tabular-nums shrink-0 ${seg.free ? 'text-green-400' : 'text-stone-200'}`}>
+                          월 ₩{seg.monthlyAmount.toLocaleString()}
                         </span>
                       </div>
                     );
@@ -990,69 +992,80 @@ function describePromotionPlan(rule: PromotionRule | null, months: number, overr
   return '';
 }
 
-interface MonthlyLine {
-  month: number;
-  rate: number;     // 0~1
-  amount: number;   // 해당 월 납입액 (무료월은 0)
+interface RentalSegment {
+  start: number;
+  end: number;
+  rate: number;          // 0~1
+  monthlyAmount: number; // 각 월 납입액 (무료월은 0)
   free: boolean;
 }
 
 /**
- * 월별 납입 라인을 분해. 모든 프로모션 타입을 지원.
- * - per_month_schedule: 월별 개별 rate
- * - free_months: 앞 N개월 정가, 뒤 free개월 0원
- * - discount_rate: 전 기간 동일 rate
- * - fixed_discount: 총액 할인을 균등 분산
- * - null: 장기할인 tier rate 동일 적용
+ * 렌탈 기간을 할인 구간별로 분할. 연속된 같은 rate 는 한 세그먼트로 병합.
+ * 모든 프로모션 타입을 지원.
  */
-function buildMonthlyRental(size: CabinetSize, months: number, rule: PromotionRule | null): MonthlyLine[] {
+function buildRentalSegments(size: CabinetSize, months: number, rule: PromotionRule | null): RentalSegment[] {
   const base = SIZE_INFO[size].price;
-  const lines: MonthlyLine[] = [];
+  const rates: { rate: number; free: boolean }[] = [];
 
   if (!rule) {
     const p = calculatePrice({ cabinetSize: size, months, promotion: null });
-    for (let m = 1; m <= months; m++) {
-      lines.push({ month: m, rate: p.discountRate, amount: Math.round(base * (1 - p.discountRate)), free: false });
-    }
-    return lines;
-  }
-
-  if (rule.type === 'discount_rate') {
-    const rate = Math.min(Math.max(Number(rule.discountRate ?? 0), 0), 1);
-    for (let m = 1; m <= months; m++) {
-      lines.push({ month: m, rate, amount: Math.round(base * (1 - rate)), free: false });
-    }
-    return lines;
-  }
-
-  if (rule.type === 'free_months') {
+    for (let m = 1; m <= months; m++) rates.push({ rate: p.discountRate, free: false });
+  } else if (rule.type === 'discount_rate') {
+    const r = Math.min(Math.max(Number(rule.discountRate ?? 0), 0), 1);
+    for (let m = 1; m <= months; m++) rates.push({ rate: r, free: false });
+  } else if (rule.type === 'free_months') {
     const free = Math.min(Math.max(rule.freeMonths ?? 0, 0), months - 1);
     const paid = months - free;
-    for (let m = 1; m <= paid; m++) lines.push({ month: m, rate: 0, amount: base, free: false });
-    for (let m = paid + 1; m <= months; m++) lines.push({ month: m, rate: 1, amount: 0, free: true });
-    return lines;
-  }
-
-  if (rule.type === 'per_month_schedule') {
+    for (let m = 1; m <= paid; m++) rates.push({ rate: 0, free: false });
+    for (let m = paid + 1; m <= months; m++) rates.push({ rate: 1, free: true });
+  } else if (rule.type === 'per_month_schedule') {
     const schedule = Array.isArray(rule.monthlySchedule) ? rule.monthlySchedule : [];
     for (let m = 1; m <= months; m++) {
       const entry = schedule.find(e => e.months.includes(m));
-      const rate = entry?.rate ?? 0;
-      lines.push({ month: m, rate, amount: Math.round(base * (1 - rate)), free: false });
+      rates.push({ rate: entry?.rate ?? 0, free: false });
     }
-    return lines;
+  } else {
+    // fixed_discount: 총액 할인을 균등 분산 → 전 기간 동일 rate
+    const amount = Math.max(rule.discountAmount ?? 0, 0);
+    const baseRental = base * months;
+    const totalRental = Math.max(baseRental - amount, 0);
+    const effectiveRate = baseRental > 0 ? (baseRental - totalRental) / baseRental : 0;
+    for (let m = 1; m <= months; m++) rates.push({ rate: effectiveRate, free: false });
   }
 
-  // fixed_discount: 균등 분산
-  const amount = Math.max(rule.discountAmount ?? 0, 0);
-  const baseRental = base * months;
-  const totalRental = Math.max(baseRental - amount, 0);
-  const effectiveRate = baseRental > 0 ? (baseRental - totalRental) / baseRental : 0;
-  const perMonth = Math.round(totalRental / months);
-  for (let m = 1; m <= months; m++) {
-    lines.push({ month: m, rate: effectiveRate, amount: perMonth, free: false });
+  if (rates.length === 0) return [];
+
+  const segments: RentalSegment[] = [];
+  let segStart = 1;
+  for (let i = 1; i < rates.length; i++) {
+    if (rates[i].rate !== rates[i - 1].rate || rates[i].free !== rates[i - 1].free) {
+      const cur = rates[i - 1];
+      segments.push({
+        start: segStart,
+        end: i,
+        rate: cur.rate,
+        monthlyAmount: cur.free ? 0 : Math.round(base * (1 - cur.rate)),
+        free: cur.free,
+      });
+      segStart = i + 1;
+    }
   }
-  return lines;
+  const last = rates[rates.length - 1];
+  segments.push({
+    start: segStart,
+    end: rates.length,
+    rate: last.rate,
+    monthlyAmount: last.free ? 0 : Math.round(base * (1 - last.rate)),
+    free: last.free,
+  });
+  return segments;
+}
+
+function segmentLabel(start: number, end: number): string {
+  if (start === end) return start === 1 ? '첫달' : `${start}개월차`;
+  if (start === 1) return `첫 ${end}개월`;
+  return `${start}~${end}개월차`;
 }
 
 function formatMonthSpan(months: number[]): string {
