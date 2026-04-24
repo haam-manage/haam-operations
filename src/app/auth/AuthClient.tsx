@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { formatPhone } from '../../components/Input';
 import { ConsentCheckboxes, type ConsentState } from '../../components/ConsentCheckboxes';
 
-type Stage = 'intro' | 'otp' | 'terms' | 'done';
+type Stage = 'intro' | 'terms' | 'otp' | 'done';
 
 interface Props {
   redirectTo: string;
@@ -57,7 +57,32 @@ export default function AuthClient({ redirectTo }: Props) {
     return () => clearTimeout(t);
   }, [nameValid, name]);
 
-  const handleSendOtp = async () => {
+  const sendOtp = async () => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const res = await fetch('/api/auth/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: cleanPhone }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast.error(data.error);
+      return false;
+    }
+
+    setCountdown(data.expiresIn || 180);
+    setOtpChannel(data.channel || 'alimtalk');
+    setStage('otp');
+    toast.success(
+      data.channel === 'sms'
+        ? '문자로 인증번호를 발송했어요'
+        : '카카오톡으로 인증번호를 발송했어요'
+    );
+    return true;
+  };
+
+  const handleIntroNext = async () => {
     const cleanPhone = phone.replace(/\D/g, '');
     if (!nameValid) {
       toast.error('이름을 먼저 입력해 주세요');
@@ -79,26 +104,37 @@ export default function AuthClient({ redirectTo }: Props) {
       setIsReturningUser(checkData.exists);
       setExistingName(checkData.name);
 
-      const res = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanPhone }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error);
-        return;
+      if (checkData.exists) {
+        await sendOtp();
+      } else {
+        setStage('terms');
       }
+    } catch {
+      toast.error('네트워크 오류가 발생했습니다');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      setCountdown(data.expiresIn || 180);
-      setOtpChannel(data.channel || 'alimtalk');
-      setStage('otp');
-      toast.success(
-        data.channel === 'sms'
-          ? '문자로 인증번호를 발송했어요'
-          : '카카오톡으로 인증번호를 발송했어요'
-      );
+  const handleAgreeAndSendOtp = async () => {
+    if (!consentValid) {
+      toast.error('필수 약관에 동의해 주세요');
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendOtp();
+    } catch {
+      toast.error('네트워크 오류가 발생했습니다');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setLoading(true);
+    try {
+      await sendOtp();
     } catch {
       toast.error('네트워크 오류가 발생했습니다');
     } finally {
@@ -129,41 +165,22 @@ export default function AuthClient({ redirectTo }: Props) {
       }
 
       if (data.isNewUser) {
-        setStage('terms');
+        const regRes = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim() }),
+        });
+        const regData = await regRes.json();
+        if (!regRes.ok) {
+          toast.error(regData.error);
+          return;
+        }
+        setStage('done');
+        toast.success(`${regData.customerName}님, 환영합니다!`);
       } else {
         setStage('done');
         toast.success(`${data.customerName}님, 다시 만나서 반가워요!`);
-        setTimeout(() => router.push(redirectTo), 1200);
       }
-    } catch {
-      toast.error('네트워크 오류가 발생했습니다');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async () => {
-    if (!consentValid) {
-      toast.error('필수 약관에 동의해 주세요');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error);
-        return;
-      }
-
-      setStage('done');
-      toast.success(`${data.customerName}님, 환영합니다!`);
       setTimeout(() => router.push(redirectTo), 1200);
     } catch {
       toast.error('네트워크 오류가 발생했습니다');
@@ -186,12 +203,14 @@ export default function AuthClient({ redirectTo }: Props) {
 
   const goBack = () => {
     if (stage === 'otp') {
-      setStage('intro');
+      setStage(isReturningUser ? 'intro' : 'terms');
       setOtp('');
+    } else if (stage === 'terms') {
+      setStage('intro');
     } else router.back();
   };
 
-  const progress = stage === 'intro' ? (nameValid ? 40 : 20) : stage === 'otp' ? 70 : 100;
+  const progress = stage === 'intro' ? (nameValid ? 25 : 15) : stage === 'terms' ? 55 : stage === 'otp' ? 80 : 100;
 
   const greetName = isReturningUser && existingName ? existingName : name.trim();
 
@@ -199,7 +218,7 @@ export default function AuthClient({ redirectTo }: Props) {
     <main className="min-h-screen flex flex-col">
       <header className="safe-top sticky top-0 bg-[#0c0a09]/95 backdrop-blur-lg z-40">
         <div className="max-w-lg mx-auto px-5 py-3 flex items-center justify-between">
-          {stage !== 'done' && stage !== 'terms' ? (
+          {stage !== 'done' ? (
             <button onClick={goBack} className="touch-target w-10 h-10 -ml-2 flex items-center text-stone-400">
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -283,9 +302,11 @@ export default function AuthClient({ redirectTo }: Props) {
                         placeholder="010-1234-5678"
                         className="input-dark text-lg"
                         autoComplete="tel"
-                        onKeyDown={e => e.key === 'Enter' && phoneValid && handleSendOtp()}
+                        onKeyDown={e => e.key === 'Enter' && phoneValid && handleIntroNext()}
                       />
-                      <p className="text-xs text-stone-600 mt-2">카카오톡으로 인증번호를 보내드려요</p>
+                      <p className="text-xs text-stone-600 mt-2">
+                        본인확인 목적으로 전화번호가 사용됩니다
+                      </p>
                     </motion.div>
 
                     <motion.div
@@ -348,7 +369,7 @@ export default function AuthClient({ redirectTo }: Props) {
                     {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
                   </span>
                 ) : (
-                  <button onClick={handleSendOtp} className="text-amber-600 underline">
+                  <button onClick={handleResendOtp} className="text-amber-600 underline">
                     재발송
                   </button>
                 )}
@@ -386,10 +407,10 @@ export default function AuthClient({ redirectTo }: Props) {
               className="mb-8"
             >
               <h1 className="text-2xl font-bold text-white mb-2">
-                마지막 단계예요
+                약관에 동의해 주세요
               </h1>
               <p className="text-sm text-stone-500">
-                {name.trim()}님, 약관에 동의해 주세요
+                {name.trim()}님, 동의 후 인증번호를 보내드려요
               </p>
             </motion.div>
 
@@ -438,14 +459,28 @@ export default function AuthClient({ redirectTo }: Props) {
           <div className="max-w-lg mx-auto">
             {stage === 'intro' && (
               <button
-                onClick={handleSendOtp}
+                onClick={handleIntroNext}
                 disabled={!nameValid || !phoneValid || loading}
                 className="btn-primary w-full py-4 text-base gap-2"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                   <>
-                    인증번호 받기
+                    다음
                     <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
+            )}
+            {stage === 'terms' && (
+              <button
+                onClick={handleAgreeAndSendOtp}
+                disabled={!consentValid || loading}
+                className="btn-primary w-full py-4 text-base gap-2"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                  <>
+                    {!consentValid ? '필수 약관에 동의해 주세요' : '인증번호 받기'}
+                    {consentValid && <ArrowRight className="w-5 h-5" />}
                   </>
                 )}
               </button>
@@ -460,20 +495,6 @@ export default function AuthClient({ redirectTo }: Props) {
                   <>
                     확인
                     <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </button>
-            )}
-            {stage === 'terms' && (
-              <button
-                onClick={handleRegister}
-                disabled={!consentValid || loading}
-                className="btn-primary w-full py-4 text-base gap-2"
-              >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                  <>
-                    {!consentValid ? '필수 약관에 동의해 주세요' : '시작하기'}
-                    {consentValid && <ArrowRight className="w-5 h-5" />}
                   </>
                 )}
               </button>

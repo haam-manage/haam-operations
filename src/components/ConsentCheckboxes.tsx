@@ -32,6 +32,15 @@ export function ConsentCheckboxes({ value, onChange }: ConsentCheckboxesProps) {
     });
   };
 
+  const setRequiredOnly = () => {
+    onChange({
+      age14: true,
+      terms: true,
+      privacy: true,
+      marketing: false,
+    });
+  };
+
   const toggle = (key: keyof ConsentState) => {
     onChange({ ...value, [key]: !value[key] });
   };
@@ -39,18 +48,27 @@ export function ConsentCheckboxes({ value, onChange }: ConsentCheckboxesProps) {
   return (
     <>
       <div className="space-y-3">
-        {/* 모두 동의 */}
-        <button
-          onClick={toggleAll}
-          className="w-full flex items-center gap-3 p-4 glass-warm rounded-xl active:scale-[0.98] transition-transform"
-        >
-          <CheckCircle checked={allChecked} size="lg" />
-          <span className="text-base font-semibold text-white">모두 동의합니다</span>
-        </button>
+        {/* 모두 동의 / 필수만 동의 */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={toggleAll}
+            className="flex items-center justify-center gap-2 p-3.5 rounded-xl bg-white/5 border border-white/10 active:scale-[0.98] transition-transform"
+          >
+            <CheckCircle checked={allChecked} />
+            <span className="text-sm font-medium text-stone-200">모두 동의</span>
+          </button>
+          <button
+            onClick={setRequiredOnly}
+            className="flex items-center justify-center gap-2 p-3.5 rounded-xl glass-warm active:scale-[0.98] transition-transform"
+          >
+            <CheckCircle checked={allRequiredChecked && !value.marketing} />
+            <span className="text-sm font-semibold text-white">필수만 동의</span>
+          </button>
+        </div>
 
         <div className="h-px bg-white/5 mx-2" />
 
-        {/* 개별 항목 */}
+        {/* 필수 */}
         <CheckRow
           checked={value.age14}
           required
@@ -71,9 +89,13 @@ export function ConsentCheckboxes({ value, onChange }: ConsentCheckboxesProps) {
           onToggle={() => toggle('privacy')}
           onView={() => setViewTerms('privacy')}
         />
+
+        <div className="h-px bg-white/5 mx-2 my-1" />
+
+        {/* 선택 */}
         <CheckRow
           checked={value.marketing}
-          label="마케팅 정보 수신 (선택)"
+          label="마케팅 수신 — 할인 쿠폰·이벤트 알림"
           onToggle={() => toggle('marketing')}
           onView={() => setViewTerms('marketing')}
         />
