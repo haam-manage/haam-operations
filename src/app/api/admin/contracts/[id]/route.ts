@@ -13,6 +13,7 @@ const PatchSchema = z.object({
   months: z.number().int().min(1).max(36).optional(),
   expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   rentalAmount: z.number().int().min(0).optional(),
+  additionalPaymentAmount: z.number().int().min(0).optional(),
   remark: z.string().max(2000).optional(),
   remarkAppend: z.string().max(500).optional(),
   sendAlimtalk: z.boolean().optional(),
@@ -140,15 +141,17 @@ export async function PATCH(
   // 알림톡 발송 (옵션)
   let alimtalk: { sent: boolean; reason?: string } = { sent: false };
   if (input.sendAlimtalk && scheduleChanged) {
-    const newMonths = updates.months ?? contract.months;
     const newExpiry = (updates.expiryDate as string | undefined) ?? contract.expiryDate;
+    const additional = input.additionalPaymentAmount
+      ?? Math.max(0, (updates.rentalAmount ?? contract.rentalAmount) - contract.rentalAmount);
     const result = await sendContractExtendAlimtalk({
       phone: contract.customer!.phone,
       customerName: contract.customer!.name,
       cabinetNumber: contract.cabinet!.number,
+      startDate: contract.startDate,
       oldExpiryDate: contract.expiryDate,
       newExpiryDate: newExpiry,
-      newMonths,
+      additionalPayment: additional,
       contractId: contract.id,
     });
     alimtalk = { sent: result.success, reason: result.errorMessage };

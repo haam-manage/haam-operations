@@ -33,7 +33,7 @@ export const TEMPLATE_IDS = {
   VISIT_CONFIRM:         'KA01TP260319083213962X1nqM6ujxhP',
   CONTRACT_RESERVATION:  'KA01TP260222235233515FtWm3CNVkwp',
   CONTRACT_PAYMENT:      'KA01TP260223005507374rBSS64NruUq',
-  CONTRACT_MONTH_CHANGE: 'KA01TP260309141600667NsORhxn4bZU',
+  CONTRACT_MONTH_CHANGE: 'KA01TP260427070619776cRNHWbgbaWN',
   CO_USER_REGISTER:      'KA01TP260316154204906cKwlP2Ej2ib',
   CO_USER_INVITE:        'KA01TP260320011320285dBxZ1N7OjIw',
   CO_USER_CONFIRM:       'KA01TP260320011655252MdTQq4X5mIK',
@@ -248,16 +248,17 @@ export async function sendOtpAlimtalk(params: {
 /**
  * 계약 기간 변경 알림톡 발송 (관리자 수동 연장 등)
  *
- * Solapi 템플릿(CONTRACT_MONTH_CHANGE) 변수가 콘솔과 일치해야 한다.
- * 변수명이 다르면 이 함수의 키를 콘솔에 맞게 수정.
+ * Solapi 템플릿(CONTRACT_MONTH_CHANGE) 변수와 1:1 매칭.
+ * 추가결제금액은 천 단위 콤마 포함 정수 문자열로 전달.
  */
 export async function sendContractExtendAlimtalk(params: {
   phone: string;
   customerName: string;
   cabinetNumber: string;
+  startDate: string;
   oldExpiryDate: string;
   newExpiryDate: string;
-  newMonths: number;
+  additionalPayment: number;
   contractId?: string;
 }): Promise<SendAlimtalkResult> {
   return sendAlimtalk({
@@ -266,9 +267,10 @@ export async function sendContractExtendAlimtalk(params: {
     variables: {
       '#{고객명}': params.customerName,
       '#{보관함번호}': params.cabinetNumber,
+      '#{기존계약일}': params.startDate,
       '#{기존만료일}': params.oldExpiryDate,
-      '#{새만료일}': params.newExpiryDate,
-      '#{개월수}': String(params.newMonths),
+      '#{변경만료일}': params.newExpiryDate,
+      '#{추가결제금액}': params.additionalPayment.toLocaleString(),
     },
     contractId: params.contractId,
   });

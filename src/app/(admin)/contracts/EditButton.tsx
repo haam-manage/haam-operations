@@ -30,20 +30,24 @@ export function EditButton({ row }: { row: ContractRow }) {
   const [open, setOpen] = useState(false);
   const [months, setMonths] = useState(row.months);
   const [expiryDate, setExpiryDate] = useState(row.expiryDate);
+  const [additionalPayment, setAdditionalPayment] = useState(0);
   const [rentalAmount, setRentalAmount] = useState(row.rentalAmount);
   const [remarkAppend, setRemarkAppend] = useState('');
   const [sendAlimtalk, setSendAlimtalk] = useState(true);
   const [autoExpiry, setAutoExpiry] = useState(true);
+  const [autoRental, setAutoRental] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const reset = () => {
     setMonths(row.months);
     setExpiryDate(row.expiryDate);
+    setAdditionalPayment(0);
     setRentalAmount(row.rentalAmount);
     setRemarkAppend('');
     setSendAlimtalk(true);
     setAutoExpiry(true);
+    setAutoRental(true);
     setError(null);
   };
 
@@ -61,6 +65,11 @@ export function EditButton({ row }: { row: ContractRow }) {
   const amountChanged = rentalAmount !== row.rentalAmount;
   const hasChanges = scheduleChanged || amountChanged || remarkAppend.trim().length > 0;
 
+  const onAdditionalPaymentChange = (n: number) => {
+    setAdditionalPayment(n);
+    if (autoRental) setRentalAmount(row.rentalAmount + n);
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!hasChanges) {
@@ -73,6 +82,7 @@ export function EditButton({ row }: { row: ContractRow }) {
       if (months !== row.months) body.months = months;
       if (expiryDate !== row.expiryDate) body.expiryDate = expiryDate;
       if (rentalAmount !== row.rentalAmount) body.rentalAmount = rentalAmount;
+      if (additionalPayment > 0) body.additionalPaymentAmount = additionalPayment;
       if (remarkAppend.trim()) body.remarkAppend = remarkAppend.trim();
       if (sendAlimtalk && scheduleChanged) body.sendAlimtalk = true;
 
@@ -172,24 +182,62 @@ export function EditButton({ row }: { row: ContractRow }) {
                 </p>
               </div>
 
+              {/* additional payment */}
+              <div>
+                <label className="text-xs text-stone-400 mb-1.5 block">
+                  추가 결제 금액 (원)
+                  <span className="text-[10px] text-stone-600 ml-1">— 알림톡에 표시</span>
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={additionalPayment}
+                  onChange={(e) => onAdditionalPaymentChange(Math.max(0, Number(e.target.value) || 0))}
+                  placeholder="예: 50000"
+                  className="w-full px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-sm text-white tabular-nums placeholder:text-stone-600 focus:outline-none focus:ring-1 focus:ring-amber-600/40"
+                />
+                <p className="text-[10px] text-stone-600 mt-1">
+                  연장에 대해 별도 결제받은 금액. 0 이면 알림톡에 0원으로 표시됨
+                </p>
+              </div>
+
               {/* rental amount */}
               <div>
-                <label className="text-xs text-stone-400 mb-1.5 flex justify-between">
+                <label className="text-xs text-stone-400 mb-1.5 flex justify-between items-center">
                   <span>총 렌탈료 (원)</span>
-                  {amountChanged && (
-                    <span className="text-amber-400">기존 ₩{row.rentalAmount.toLocaleString()}</span>
-                  )}
+                  <label className="inline-flex items-center gap-1 text-[11px] cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={autoRental}
+                      onChange={(e) => {
+                        setAutoRental(e.target.checked);
+                        if (e.target.checked) setRentalAmount(row.rentalAmount + additionalPayment);
+                      }}
+                      className="accent-amber-600 w-3.5 h-3.5"
+                    />
+                    추가금액 합산 자동
+                  </label>
                 </label>
                 <input
                   type="number"
                   min={0}
                   step={1000}
                   value={rentalAmount}
-                  onChange={(e) => setRentalAmount(Math.max(0, Number(e.target.value) || 0))}
+                  onChange={(e) => {
+                    setRentalAmount(Math.max(0, Number(e.target.value) || 0));
+                    setAutoRental(false);
+                  }}
                   className="w-full px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-sm text-white tabular-nums focus:outline-none focus:ring-1 focus:ring-amber-600/40"
                 />
                 <p className="text-[10px] text-stone-600 mt-1">
-                  기간 변경 시 자동 재계산하지 않음 — 합의 금액 직접 입력
+                  {amountChanged ? (
+                    <span className="text-amber-400">
+                      기존 ₩{row.rentalAmount.toLocaleString()} → ₩{rentalAmount.toLocaleString()}
+                    </span>
+                  ) : (
+                    <>기존 ₩{row.rentalAmount.toLocaleString()} 유지</>
+                  )}
                 </p>
               </div>
 
@@ -230,7 +278,11 @@ export function EditButton({ row }: { row: ContractRow }) {
                   <div className="flex-1">
                     <div className="text-xs text-amber-200 font-medium">고객에게 변경 알림톡 발송</div>
                     <div className="text-[11px] text-amber-200/70 mt-0.5">
-                      카카오 알림톡(CONTRACT_MONTH_CHANGE) 으로 새 만료일 안내
+                      <div>· 보관함: {row.cabinetNumber}</div>
+                      <div>· 기존계약일: {row.startDate}</div>
+                      <div>· 기존만료일: {row.expiryDate}</div>
+                      <div>· 변경만료일: <span className="text-amber-200 font-medium">{expiryDate}</span></div>
+                      <div>· 추가결제금액: <span className="text-amber-200 font-medium">₩{additionalPayment.toLocaleString()}</span></div>
                     </div>
                   </div>
                 </label>
