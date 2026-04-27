@@ -246,6 +246,35 @@ export async function sendOtpAlimtalk(params: {
 }
 
 /**
+ * 계약 기간 변경 알림톡 발송 (관리자 수동 연장 등)
+ *
+ * Solapi 템플릿(CONTRACT_MONTH_CHANGE) 변수가 콘솔과 일치해야 한다.
+ * 변수명이 다르면 이 함수의 키를 콘솔에 맞게 수정.
+ */
+export async function sendContractExtendAlimtalk(params: {
+  phone: string;
+  customerName: string;
+  cabinetNumber: string;
+  oldExpiryDate: string;
+  newExpiryDate: string;
+  newMonths: number;
+  contractId?: string;
+}): Promise<SendAlimtalkResult> {
+  return sendAlimtalk({
+    templateId: TEMPLATE_IDS.CONTRACT_MONTH_CHANGE,
+    recipientPhone: params.phone,
+    variables: {
+      '#{고객명}': params.customerName,
+      '#{보관함번호}': params.cabinetNumber,
+      '#{기존만료일}': params.oldExpiryDate,
+      '#{새만료일}': params.newExpiryDate,
+      '#{개월수}': String(params.newMonths),
+    },
+    contractId: params.contractId,
+  });
+}
+
+/**
  * 공동사용자 초대 알림톡 발송
  */
 export async function sendCoUserInviteAlimtalk(params: {

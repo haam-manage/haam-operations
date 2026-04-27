@@ -11,6 +11,7 @@
 
 export type TelegramEventType =
   | 'new_contract'
+  | 'contract_extended'
   | 'payment_complete'
   | 'qr_registered'
   | 'qr_failed'
@@ -79,6 +80,7 @@ export async function notifyEvent(
 
 const EVENT_EMOJI: Record<TelegramEventType, string> = {
   new_contract: '📝',
+  contract_extended: '🔁',
   payment_complete: '💳',
   qr_registered: '✅',
   qr_failed: '❌',
@@ -93,6 +95,7 @@ const EVENT_EMOJI: Record<TelegramEventType, string> = {
 
 const EVENT_TITLE: Record<TelegramEventType, string> = {
   new_contract: '신규 계약',
+  contract_extended: '계약 수동 변경',
   payment_complete: '결제 완료',
   qr_registered: 'QR 등록 완료',
   qr_failed: 'QR 등록 실패',
